@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.9.34902.65
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PodmanClientDotNet", "PodmanClient\PodmanClientDotNet.csproj", "{0833C90F-6BF3-40E4-A035-B6D6C81DB9D7}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{0833C90F-6BF3-40E4-A035-B6D6C81DB9D7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0833C90F-6BF3-40E4-A035-B6D6C81DB9D7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0833C90F-6BF3-40E4-A035-B6D6C81DB9D7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0833C90F-6BF3-40E4-A035-B6D6C81DB9D7}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {CFC10A81-CC42-4585-B549-1C2214AC18DA}
+	EndGlobalSection
+EndGlobal
