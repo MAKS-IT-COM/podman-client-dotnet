@@ -5,6 +5,18 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>MaksIT.$(MSBuildProjectName.Replace(" ", "_"))</RootNamespace>
+
+    <!-- NuGet package metadata -->
+    <PackageId>PodmanClient.DotNet</PackageId>
+    <Version>1.0.2</Version>
+    <Authors>Maksym Sadovnychyy</Authors>
+    <Company>MAKS-IT</Company>
+    <Product>PodmanClient</Product>
+    <Description>Podman API client .NET implementation</Description>
+    <PackageTags>podman client dotnet</PackageTags>
+    <RepositoryUrl>https://github.com/MAKS-IT-COM/podman-client-dotnet</RepositoryUrl>
+    <License>MIT</License>
+    <RequireLicenseAcceptance>false</RequireLicenseAcceptance>
   </PropertyGroup>
 
 </Project>

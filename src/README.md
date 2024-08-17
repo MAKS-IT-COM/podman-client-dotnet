@@ -1,6 +1,3 @@
-Sure! Here's how your README file would look in Markdown format:
-
-```markdown
 # PodmanClientDotNet
 
 ## Description
@@ -47,7 +44,7 @@ await podmanClient.StartExecAsync(execResponse.Id);
 To include `PodmanClientDotNet` in your .NET project, you can add the package via NuGet:
 
 ```shell
-dotnet add package PodmanClient.DotNet --version 1.0.2
+dotnet add package PodmanClientDotNet
 ```
 
 ## Documentation
@@ -60,11 +57,36 @@ Contributions to this project are welcome! Please fork the repository and submit
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE.md) file for details.
+This project is licensed under the MIT License. See the full license text below.
+
+---
+
+### MIT License
+
+```
+MIT License
+
+Copyright (c) 2024 Maksym Sadovnychyy (MAKS-IT)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
 
 ## Contact
 
 For any questions or inquiries, please reach out via GitHub or [email](mailto:maksym.sadovnychyy@gmail.com).
-```
-
-This Markdown file is structured to provide a clear and informative README for your GitHub repository, offering essential details about your `PodmanClientDotNet` library.
