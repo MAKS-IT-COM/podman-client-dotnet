@@ -1,26 +1,28 @@
 ﻿using System.Text;
-using System.Text.Json;
 
-using MaksIT.PodmanClientDotNet.Extensions;
-using MaksIT.PodmanClientDotNet.Models.Exec;
+using Microsoft.Extensions.Logging;
+
 using MaksIT.PodmanClientDotNet.Models;
+using MaksIT.PodmanClientDotNet.Models.Exec;
+using MaksIT.PodmanClientDotNet.Extensions;
+
 
 namespace MaksIT.PodmanClientDotNet {
   public partial class PodmanClient {
 
     public async Task<CreateExecResponse> CreateExecAsync(
-        string containerName,
-        string[] cmd,
-        bool attachStderr = true,
-        bool attachStdin = false,
-        bool attachStdout = true,
-        string detachKeys = null,
-        string[] env = null,
-        bool privileged = false,
-        bool tty = false,
-        string user = null,
-        string workingDir = null
-      ) {
+      string containerName,
+      string[] cmd,
+      bool attachStderr = true,
+      bool attachStdin = false,
+      bool attachStdout = true,
+      string detachKeys = null,
+      string[] env = null,
+      bool privileged = false,
+      bool tty = false,
+      string user = null,
+      string workingDir = null
+    ) {
       // Construct the request object
       var execRequest = new CreateExecRequest {
         AttachStderr = attachStderr,
@@ -40,7 +42,7 @@ namespace MaksIT.PodmanClientDotNet {
       var content = new StringContent(jsonRequest, Encoding.UTF8, "application/json");
 
       // Create the request URL
-      var requestUrl = $"/containers/{Uri.EscapeDataString(containerName)}/exec";
+      var requestUrl = $"/{_apiVersion}/containers/{Uri.EscapeDataString(containerName)}/exec";
 
       // Send the POST request
       var response = await _httpClient.PostAsync(requestUrl, content);
@@ -51,21 +53,21 @@ namespace MaksIT.PodmanClientDotNet {
       }
       else {
         var jsonResponse = await response.Content.ReadAsStringAsync();
-        var errorResponse = JsonSerializer.Deserialize<ErrorResponse>(jsonResponse);
+        var errorResponse = jsonResponse.ToObject<ErrorResponse>();
 
         // Handle different response codes
         switch (response.StatusCode) {
           case System.Net.HttpStatusCode.NotFound:
-            Console.WriteLine($"No such container: {errorResponse?.Message}");
+            _logger.LogInformation($"No such container: {errorResponse?.Message}");
             break;
           case System.Net.HttpStatusCode.Conflict:
-            Console.WriteLine($"Conflict error: {errorResponse?.Message}");
+            _logger.LogInformation($"Conflict error: {errorResponse?.Message}");
             break;
           case System.Net.HttpStatusCode.InternalServerError:
-            Console.WriteLine($"Internal server error: {errorResponse?.Message}");
+            _logger.LogInformation($"Internal server error: {errorResponse?.Message}");
             break;
           default:
-            Console.WriteLine($"Error creating exec instance: {errorResponse?.Message}");
+            _logger.LogInformation($"Error creating exec instance: {errorResponse?.Message}");
             break;
         }
 
@@ -75,16 +77,12 @@ namespace MaksIT.PodmanClientDotNet {
     }
 
     public async Task StartExecAsync(
-      string execId,
-      bool detach = false,
-      bool tty = false,
-      int? height = null,
-      int? width = null,
-      string outputFilePath = "exec_output.log"
-    ) {
-
-      outputFilePath = Path.Combine(Path.GetTempPath(), outputFilePath);
-
+    string execId,
+    bool detach = false,
+    bool tty = false,
+    int? height = null,
+    int? width = null
+) {
       // Construct the request object
       var startExecRequest = new StartExecRequest {
         Detach = detach,
@@ -94,41 +92,37 @@ namespace MaksIT.PodmanClientDotNet {
       };
 
       // Serialize the request object to JSON
-      var jsonRequest = JsonSerializer.Serialize(startExecRequest);
+      var jsonRequest = startExecRequest.ToJson();
       var content = new StringContent(jsonRequest, Encoding.UTF8, "application/json");
 
       // Create the request URL
-      var requestUrl = $"/exec/{Uri.EscapeDataString(execId)}/start";
+      var requestUrl = $"/{_apiVersion}/exec/{Uri.EscapeDataString(execId)}/start";
 
       // Send the POST request
       var response = await _httpClient.PostAsync(requestUrl, content);
 
       if (response.IsSuccessStatusCode) {
-        // Write the response stream directly to a file
-        using (var responseStream = await response.Content.ReadAsStreamAsync())
-        using (var fileStream = new FileStream(outputFilePath, FileMode.Create, FileAccess.Write)) {
-          await responseStream.CopyToAsync(fileStream);
-        }
-        var test = File.ReadAllText(outputFilePath);
-        Console.WriteLine($"Exec instance started and output written to {outputFilePath}");
+        var stringResponse = await response.Content.ReadAsStringAsync();
+        _logger.LogInformation(stringResponse);
+       
       }
       else {
         var jsonResponse = await response.Content.ReadAsStringAsync();
-        var errorResponse = JsonSerializer.Deserialize<ErrorResponse>(jsonResponse);
+        var errorResponse = jsonResponse.ToObject<ErrorResponse>();
 
         // Handle different response codes
         switch (response.StatusCode) {
           case System.Net.HttpStatusCode.NotFound:
-            Console.WriteLine($"No such exec instance: {errorResponse?.Message}");
+            _logger.LogWarning($"No such exec instance: {errorResponse?.Message}");
             break;
           case System.Net.HttpStatusCode.Conflict:
-            Console.WriteLine($"Conflict error: {errorResponse?.Message}");
+            _logger.LogError($"Conflict error: {errorResponse?.Message}");
             break;
           case System.Net.HttpStatusCode.InternalServerError:
-            Console.WriteLine($"Internal server error: {errorResponse?.Message}");
+            _logger.LogError($"Internal server error: {errorResponse?.Message}");
             break;
           default:
-            Console.WriteLine($"Error starting exec instance: {errorResponse?.Message}");
+            _logger.LogError($"Error starting exec instance: {errorResponse?.Message}");
             break;
         }
 
@@ -136,8 +130,9 @@ namespace MaksIT.PodmanClientDotNet {
       }
     }
 
+
     public async Task<InspectExecResponse?> InspectExecAsync(string execId) {
-      var requestUrl = $"/exec/{Uri.EscapeDataString(execId)}/json";
+      var requestUrl = $"/{_apiVersion}/exec/{Uri.EscapeDataString(execId)}/json";
       var response = await _httpClient.GetAsync(requestUrl);
 
       if (response.IsSuccessStatusCode) {
@@ -146,19 +141,19 @@ namespace MaksIT.PodmanClientDotNet {
       }
       else {
         var jsonResponse = await response.Content.ReadAsStringAsync();
-        var errorResponse = JsonSerializer.Deserialize<ErrorResponse>(jsonResponse);
+        var errorResponse = jsonResponse.ToObject<ErrorResponse>();
 
         switch (response.StatusCode) {
           case System.Net.HttpStatusCode.NotFound:
-            Console.WriteLine($"No such exec instance: {errorResponse?.Message}");
+            _logger.LogWarning($"No such exec instance: {errorResponse?.Message}");
             return null;
 
           case System.Net.HttpStatusCode.InternalServerError:
-            Console.WriteLine($"Internal server error: {errorResponse?.Message}");
+            _logger.LogError($"Internal server error: {errorResponse?.Message}");
             break;
 
           default:
-            Console.WriteLine($"Error inspecting exec instance: {errorResponse?.Message}");
+            _logger.LogError($"Error inspecting exec instance: {errorResponse?.Message}");
             break;
         }
 

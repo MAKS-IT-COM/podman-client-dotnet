@@ -1,10 +1,12 @@
 ﻿using System.Text;
 using System.Text.Json;
 
-using MaksIT.PodmanClientDotNet.Extensions;
+using Microsoft.Extensions.Logging;
 
 using MaksIT.PodmanClientDotNet.Models;
 using MaksIT.PodmanClientDotNet.Models.Container;
+using MaksIT.PodmanClientDotNet.Extensions;
+
 
 namespace MaksIT.PodmanClientDotNet {
   public partial class PodmanClient {
@@ -246,31 +248,31 @@ namespace MaksIT.PodmanClientDotNet {
       };
 
       var jsonContent = new StringContent(JsonSerializer.Serialize(createContainerParameters), Encoding.UTF8, "application/json");
-      var response = await _httpClient.PostAsync("/v1.41/libpod/containers/create", jsonContent);
+      var response = await _httpClient.PostAsync($"/{_apiVersion}/libpod/containers/create", jsonContent);
 
       if (response.IsSuccessStatusCode) {
         var jsonResponse = await response.Content.ReadAsStringAsync();
-        return JsonSerializer.Deserialize<CreateContainerResponse>(jsonResponse);
+        return jsonResponse.ToObject<CreateContainerResponse>();
       }
       else {
         var errorContent = await response.Content.ReadAsStringAsync();
-        var errorDetails = JsonSerializer.Deserialize<ErrorResponse>(errorContent);
+        var errorDetails = errorContent.ToObject<ErrorResponse>();
 
         switch (response.StatusCode) {
           case System.Net.HttpStatusCode.BadRequest:
-            Console.WriteLine($"Bad parameter in request: {errorDetails?.Message}");
+            _logger.LogError($"Bad parameter in request: {errorDetails?.Message}");
             break;
           case System.Net.HttpStatusCode.NotFound:
-            Console.WriteLine($"No such container: {errorDetails?.Message}");
+            _logger.LogError($"No such container: {errorDetails?.Message}");
             break;
           case System.Net.HttpStatusCode.Conflict:
-            Console.WriteLine($"Conflict error in operation: {errorDetails?.Message}");
+            _logger.LogError($"Conflict error in operation: {errorDetails?.Message}");
             break;
           case System.Net.HttpStatusCode.InternalServerError:
-            Console.WriteLine($"Internal server error: {errorDetails?.Message}");
+            _logger.LogError($"Internal server error: {errorDetails?.Message}");
             break;
           default:
-            Console.WriteLine($"Error creating container: {errorDetails?.Message}");
+            _logger.LogError($"Error creating container: {errorDetails?.Message}");
             break;
         }
 
@@ -284,34 +286,34 @@ namespace MaksIT.PodmanClientDotNet {
 
     public async Task StartContainerAsync(string containerId, string detachKeys = "ctrl-p,ctrl-q") {
       var response = await _httpClient.PostAsync(
-          $"/v1.41/libpod/containers/{containerId}/start?detachKeys={Uri.EscapeDataString(detachKeys)}", null);
+          $"/{_apiVersion}/libpod/containers/{containerId}/start?detachKeys={Uri.EscapeDataString(detachKeys)}", null);
 
       switch (response.StatusCode) {
         case System.Net.HttpStatusCode.NoContent:
-          Console.WriteLine("Container started successfully.");
+          _logger.LogInformation("Container started successfully.");
           break;
 
         case System.Net.HttpStatusCode.NotModified:
-          Console.WriteLine("Container was already started.");
+          _logger.LogWarning("Container was already started.");
           break;
 
         case System.Net.HttpStatusCode.NotFound:
           var errorContent404 = await response.Content.ReadAsStringAsync();
           var errorDetails404 = errorContent404.ToObject<ErrorResponse>();
-          Console.WriteLine($"Container not found: {errorDetails404?.Message}");
+          _logger.LogError($"Container not found: {errorDetails404?.Message}");
           break;
 
         case System.Net.HttpStatusCode.InternalServerError:
           var errorContent500 = await response.Content.ReadAsStringAsync();
           var errorDetails500 = errorContent500.ToObject<ErrorResponse>();
-          Console.WriteLine($"Internal server error: {errorDetails500?.Message}");
+          _logger.LogError($"Internal server error: {errorDetails500?.Message}");
           break;
 
         default:
           if ((int)response.StatusCode >= 400) {
             var errorContent = await response.Content.ReadAsStringAsync();
             var errorDetails = errorContent.ToObject<ErrorResponse>();
-            Console.WriteLine($"Error starting container: {errorDetails?.Message}");
+            _logger.LogError($"Error starting container: {errorDetails?.Message}");
           }
           break;
       }
@@ -321,14 +323,14 @@ namespace MaksIT.PodmanClientDotNet {
 
     public async Task StopContainerAsync(string containerId, int timeout = 10, bool ignoreAlreadyStopped = false) {
       var queryParams = $"?timeout={timeout}&Ignore={ignoreAlreadyStopped.ToString().ToLower()}";
-      var response = await _httpClient.PostAsync($"/v1.41/libpod/containers/{containerId}/stop{queryParams}", null);
+      var response = await _httpClient.PostAsync($"/{_apiVersion}/libpod/containers/{containerId}/stop{queryParams}", null);
 
       if (response.IsSuccessStatusCode) {
         if (response.StatusCode == System.Net.HttpStatusCode.NoContent) {
-          Console.WriteLine("Container stopped successfully.");
+          _logger.LogInformation("Container stopped successfully.");
         }
         else if (response.StatusCode == System.Net.HttpStatusCode.NotModified) {
-          Console.WriteLine("Container was already stopped.");
+          _logger.LogWarning("Container was already stopped.");
         }
       }
       else {
@@ -337,15 +339,15 @@ namespace MaksIT.PodmanClientDotNet {
 
         switch (response.StatusCode) {
           case System.Net.HttpStatusCode.NotFound:
-            Console.WriteLine($"No such container: {errorDetails?.Message}");
+            _logger.LogError($"No such container: {errorDetails?.Message}");
             break;
 
           case System.Net.HttpStatusCode.InternalServerError:
-            Console.WriteLine($"Internal server error: {errorDetails?.Message}");
+            _logger.LogError($"Internal server error: {errorDetails?.Message}");
             break;
 
           default:
-            Console.WriteLine($"Error stopping container: {errorDetails?.Message}");
+            _logger.LogError($"Error stopping container: {errorDetails?.Message}");
             break;
         }
 
@@ -355,49 +357,49 @@ namespace MaksIT.PodmanClientDotNet {
 
     public async Task ForceDeleteContainerAsync(string containerId, bool deleteVolumes = false, int timeout = 10) {
       var queryParams = $"?force=true&v={deleteVolumes.ToString().ToLower()}&timeout={timeout}";
-      var response = await _httpClient.DeleteAsync($"/v1.41/libpod/containers/{containerId}{queryParams}");
+      var response = await _httpClient.DeleteAsync($"/{_apiVersion}/libpod/containers/{containerId}{queryParams}");
 
       if (response.IsSuccessStatusCode) {
         if (response.StatusCode == System.Net.HttpStatusCode.NoContent) {
-          Console.WriteLine("Container force deleted successfully.");
+          _logger.LogInformation("Container force deleted successfully.");
         }
         else if (response.StatusCode == System.Net.HttpStatusCode.OK) {
           var responseContent = await response.Content.ReadAsStringAsync();
-          var deleteResponses = JsonSerializer.Deserialize<DeleteContainerResponse[]>(responseContent);
+          var deleteResponses = responseContent.ToObject<DeleteContainerResponse[]>();
 
           foreach (var deleteResponse in deleteResponses) {
             if (string.IsNullOrEmpty(deleteResponse.Err)) {
-              Console.WriteLine($"Container {deleteResponse.Id} deleted successfully.");
+              _logger.LogInformation($"Container {deleteResponse.Id} deleted successfully.");
             }
             else {
-              Console.WriteLine($"Error deleting container {deleteResponse.Id}: {deleteResponse.Err}");
+              _logger.LogError($"Error deleting container {deleteResponse.Id}: {deleteResponse.Err}");
             }
           }
         }
       }
       else {
         var errorContent = await response.Content.ReadAsStringAsync();
-        var errorDetails = JsonSerializer.Deserialize<ErrorResponse>(errorContent);
+        var errorDetails = errorContent.ToObject<ErrorResponse>();
 
         switch (response.StatusCode) {
           case System.Net.HttpStatusCode.BadRequest:
-            Console.WriteLine($"Bad parameter in request: {errorDetails?.Message}");
+            _logger.LogError($"Bad parameter in request: {errorDetails?.Message}");
             break;
 
           case System.Net.HttpStatusCode.NotFound:
-            Console.WriteLine($"No such container: {errorDetails?.Message}");
+            _logger.LogError($"No such container: {errorDetails?.Message}");
             break;
 
           case System.Net.HttpStatusCode.Conflict:
-            Console.WriteLine($"Conflict error: {errorDetails?.Message}");
+            _logger.LogError($"Conflict error: {errorDetails?.Message}");
             break;
 
           case System.Net.HttpStatusCode.InternalServerError:
-            Console.WriteLine($"Internal server error: {errorDetails?.Message}");
+            _logger.LogError($"Internal server error: {errorDetails?.Message}");
             break;
 
           default:
-            Console.WriteLine($"Error deleting container: {errorDetails?.Message}");
+            _logger.LogError($"Error deleting container: {errorDetails?.Message}");
             break;
         }
 
@@ -407,11 +409,11 @@ namespace MaksIT.PodmanClientDotNet {
 
     public async Task DeleteContainerAsync(string containerId, bool depend = false, bool ignore = false, int timeout = 10) {
       var queryParams = $"?depend={depend.ToString().ToLower()}&ignore={ignore.ToString().ToLower()}&timeout={timeout}";
-      var response = await _httpClient.DeleteAsync($"/v1.41/libpod/containers/{containerId}{queryParams}");
+      var response = await _httpClient.DeleteAsync($"/libpod/containers/{containerId}{queryParams}");
 
       if (response.IsSuccessStatusCode) {
         if (response.StatusCode == System.Net.HttpStatusCode.NoContent) {
-          Console.WriteLine("Container deleted successfully.");
+          _logger.LogInformation("Container deleted successfully.");
         }
         else if (response.StatusCode == System.Net.HttpStatusCode.OK) {
           var responseContent = await response.Content.ReadAsStringAsync();
@@ -419,10 +421,10 @@ namespace MaksIT.PodmanClientDotNet {
 
           foreach (var deleteResponse in deleteResponses) {
             if (string.IsNullOrEmpty(deleteResponse.Err)) {
-              Console.WriteLine($"Container {deleteResponse.Id} deleted successfully.");
+              _logger.LogInformation($"Container {deleteResponse.Id} deleted successfully.");
             }
             else {
-              Console.WriteLine($"Error deleting container {deleteResponse.Id}: {deleteResponse.Err}");
+              _logger.LogInformation($"Error deleting container {deleteResponse.Id}: {deleteResponse.Err}");
             }
           }
         }
@@ -433,23 +435,23 @@ namespace MaksIT.PodmanClientDotNet {
 
         switch (response.StatusCode) {
           case System.Net.HttpStatusCode.BadRequest:
-            Console.WriteLine($"Bad parameter in request: {errorDetails?.Message}");
+            _logger.LogInformation($"Bad parameter in request: {errorDetails?.Message}");
             break;
 
           case System.Net.HttpStatusCode.NotFound:
-            Console.WriteLine($"No such container: {errorDetails?.Message}");
+            _logger.LogInformation($"No such container: {errorDetails?.Message}");
             break;
 
           case System.Net.HttpStatusCode.Conflict:
-            Console.WriteLine($"Conflict error: {errorDetails?.Message}");
+            _logger.LogInformation($"Conflict error: {errorDetails?.Message}");
             break;
 
           case System.Net.HttpStatusCode.InternalServerError:
-            Console.WriteLine($"Internal server error: {errorDetails?.Message}");
+            _logger.LogInformation($"Internal server error: {errorDetails?.Message}");
             break;
 
           default:
-            Console.WriteLine($"Error deleting container: {errorDetails?.Message}");
+            _logger.LogInformation($"Error deleting container: {errorDetails?.Message}");
             break;
         }
 
@@ -464,34 +466,34 @@ namespace MaksIT.PodmanClientDotNet {
       content.Headers.Add("Content-Type", "application/x-tar");
 
       var queryParams = $"?path={Uri.EscapeDataString(path)}&pause={pause.ToString().ToLower()}";
-      var response = await _httpClient.PutAsync($"/v1.41/libpod/containers/{containerId}/archive{queryParams}", content);
+      var response = await _httpClient.PutAsync($"/{_apiVersion}/libpod/containers/{containerId}/archive{queryParams}", content);
 
       if (response.IsSuccessStatusCode) {
-        Console.WriteLine("Files copied successfully to the container.");
+        _logger.LogInformation("Files copied successfully to the container.");
       }
       else {
         var errorContent = await response.Content.ReadAsStringAsync();
-        var errorDetails = JsonSerializer.Deserialize<ErrorResponse>(errorContent);
+        var errorDetails = errorContent.ToObject<ErrorResponse>();
 
         switch (response.StatusCode) {
           case System.Net.HttpStatusCode.BadRequest:
-            Console.WriteLine($"Bad parameter in request: {errorDetails?.Message}");
+            _logger.LogError($"Bad parameter in request: {errorDetails?.Message}");
             break;
 
           case System.Net.HttpStatusCode.Forbidden:
-            Console.WriteLine($"The container root filesystem is read-only: {errorDetails?.Message}");
+            _logger.LogError($"The container root filesystem is read-only: {errorDetails?.Message}");
             break;
 
           case System.Net.HttpStatusCode.NotFound:
-            Console.WriteLine($"No such container: {errorDetails?.Message}");
+            _logger.LogError($"No such container: {errorDetails?.Message}");
             break;
 
           case System.Net.HttpStatusCode.InternalServerError:
-            Console.WriteLine($"Internal server error: {errorDetails?.Message}");
+            _logger.LogError($"Internal server error: {errorDetails?.Message}");
             break;
 
           default:
-            Console.WriteLine($"Error copying files: {errorDetails?.Message}");
+            _logger.LogError($"Error copying files: {errorDetails?.Message}");
             break;
         }
 
