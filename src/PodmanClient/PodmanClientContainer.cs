@@ -6,11 +6,12 @@ using Microsoft.Extensions.Logging;
 using MaksIT.PodmanClientDotNet.Models;
 using MaksIT.PodmanClientDotNet.Models.Container;
 using MaksIT.PodmanClientDotNet.Extensions;
+using MaksIT.PodmanClientDotNet.Models.Exec;
 
 
 namespace MaksIT.PodmanClientDotNet {
   public partial class PodmanClient {
-    public async Task<CreateContainerResponse> CreateContainerAsync(
+    public async Task<CreateContainerResponse?> CreateContainerAsync(
       string name,
       string image,
       List<string> command = null,
@@ -252,7 +253,9 @@ namespace MaksIT.PodmanClientDotNet {
 
       if (response.IsSuccessStatusCode) {
         var jsonResponse = await response.Content.ReadAsStringAsync();
-        return jsonResponse.ToObject<CreateContainerResponse>();
+        return !string.IsNullOrWhiteSpace(jsonResponse)
+          ? jsonResponse.ToObject<CreateContainerResponse>()
+          : null;
       }
       else {
         var errorContent = await response.Content.ReadAsStringAsync();
@@ -277,7 +280,6 @@ namespace MaksIT.PodmanClientDotNet {
         }
 
         response.EnsureSuccessStatusCode();
-
         return null;
       }
     }
@@ -287,6 +289,14 @@ namespace MaksIT.PodmanClientDotNet {
     public async Task StartContainerAsync(string containerId, string detachKeys = "ctrl-p,ctrl-q") {
       var response = await _httpClient.PostAsync(
           $"/{_apiVersion}/libpod/containers/{containerId}/start?detachKeys={Uri.EscapeDataString(detachKeys)}", null);
+
+
+      if (response.IsSuccessStatusCode) {
+        var jsonResponse = await response.Content.ReadAsStringAsync();
+      }
+      else {
+      
+      }
 
       switch (response.StatusCode) {
         case System.Net.HttpStatusCode.NoContent:
@@ -326,6 +336,8 @@ namespace MaksIT.PodmanClientDotNet {
       var response = await _httpClient.PostAsync($"/{_apiVersion}/libpod/containers/{containerId}/stop{queryParams}", null);
 
       if (response.IsSuccessStatusCode) {
+        var jsonResponse = await response.Content.ReadAsStringAsync();
+
         if (response.StatusCode == System.Net.HttpStatusCode.NoContent) {
           _logger.LogInformation("Container stopped successfully.");
         }
@@ -355,27 +367,15 @@ namespace MaksIT.PodmanClientDotNet {
       }
     }
 
-    public async Task ForceDeleteContainerAsync(string containerId, bool deleteVolumes = false, int timeout = 10) {
+    public async Task<DeleteContainerResponse[]?> ForceDeleteContainerAsync(string containerId, bool deleteVolumes = false, int timeout = 10) {
       var queryParams = $"?force=true&v={deleteVolumes.ToString().ToLower()}&timeout={timeout}";
       var response = await _httpClient.DeleteAsync($"/{_apiVersion}/libpod/containers/{containerId}{queryParams}");
 
       if (response.IsSuccessStatusCode) {
-        if (response.StatusCode == System.Net.HttpStatusCode.NoContent) {
-          _logger.LogInformation("Container force deleted successfully.");
-        }
-        else if (response.StatusCode == System.Net.HttpStatusCode.OK) {
-          var responseContent = await response.Content.ReadAsStringAsync();
-          var deleteResponses = responseContent.ToObject<DeleteContainerResponse[]>();
-
-          foreach (var deleteResponse in deleteResponses) {
-            if (string.IsNullOrEmpty(deleteResponse.Err)) {
-              _logger.LogInformation($"Container {deleteResponse.Id} deleted successfully.");
-            }
-            else {
-              _logger.LogError($"Error deleting container {deleteResponse.Id}: {deleteResponse.Err}");
-            }
-          }
-        }
+        var jsonResponse = await response.Content.ReadAsStringAsync();
+        return !string.IsNullOrWhiteSpace(jsonResponse)
+          ? jsonResponse.ToObject<DeleteContainerResponse[]>()
+          : null;
       }
       else {
         var errorContent = await response.Content.ReadAsStringAsync();
@@ -404,34 +404,23 @@ namespace MaksIT.PodmanClientDotNet {
         }
 
         response.EnsureSuccessStatusCode();
+        return null;
       }
     }
 
-    public async Task DeleteContainerAsync(string containerId, bool depend = false, bool ignore = false, int timeout = 10) {
+    public async Task<DeleteContainerResponse[]?> DeleteContainerAsync(string containerId, bool depend = false, bool ignore = false, int timeout = 10) {
       var queryParams = $"?depend={depend.ToString().ToLower()}&ignore={ignore.ToString().ToLower()}&timeout={timeout}";
-      var response = await _httpClient.DeleteAsync($"/libpod/containers/{containerId}{queryParams}");
+      var response = await _httpClient.DeleteAsync($"/{_apiVersion}/containers/{containerId}{queryParams}");
 
       if (response.IsSuccessStatusCode) {
-        if (response.StatusCode == System.Net.HttpStatusCode.NoContent) {
-          _logger.LogInformation("Container deleted successfully.");
-        }
-        else if (response.StatusCode == System.Net.HttpStatusCode.OK) {
-          var responseContent = await response.Content.ReadAsStringAsync();
-          var deleteResponses = JsonSerializer.Deserialize<DeleteContainerResponse[]>(responseContent);
-
-          foreach (var deleteResponse in deleteResponses) {
-            if (string.IsNullOrEmpty(deleteResponse.Err)) {
-              _logger.LogInformation($"Container {deleteResponse.Id} deleted successfully.");
-            }
-            else {
-              _logger.LogInformation($"Error deleting container {deleteResponse.Id}: {deleteResponse.Err}");
-            }
-          }
-        }
+        var jsonResponse = await response.Content.ReadAsStringAsync();
+        return !string.IsNullOrWhiteSpace(jsonResponse)
+          ? jsonResponse.ToObject<DeleteContainerResponse []>()
+          : null;
       }
       else {
         var errorContent = await response.Content.ReadAsStringAsync();
-        var errorDetails = JsonSerializer.Deserialize<ErrorResponse>(errorContent);
+        var errorDetails = errorContent.ToObject<ErrorResponse>();
 
         switch (response.StatusCode) {
           case System.Net.HttpStatusCode.BadRequest:
@@ -455,7 +444,8 @@ namespace MaksIT.PodmanClientDotNet {
             break;
         }
 
-        response.EnsureSuccessStatusCode(); // Throws an exception if the response indicates an error
+        response.EnsureSuccessStatusCode();
+        return null;
       }
 
     }
@@ -469,7 +459,8 @@ namespace MaksIT.PodmanClientDotNet {
       var response = await _httpClient.PutAsync($"/{_apiVersion}/libpod/containers/{containerId}/archive{queryParams}", content);
 
       if (response.IsSuccessStatusCode) {
-        _logger.LogInformation("Files copied successfully to the container.");
+        var stringResponse = await response.Content.ReadAsStringAsync();
+        _logger.LogInformation($"Files copied successfully to the container.\n\n{stringResponse}".Trim());
       }
       else {
         var errorContent = await response.Content.ReadAsStringAsync();

@@ -10,7 +10,7 @@ using MaksIT.PodmanClientDotNet.Extensions;
 namespace MaksIT.PodmanClientDotNet {
   public partial class PodmanClient {
 
-    public async Task<CreateExecResponse> CreateExecAsync(
+    public async Task<CreateExecResponse?> CreateExecAsync(
       string containerName,
       string[] cmd,
       bool attachStderr = true,
@@ -49,7 +49,9 @@ namespace MaksIT.PodmanClientDotNet {
 
       if (response.IsSuccessStatusCode) {
         var jsonResponse = await response.Content.ReadAsStringAsync();
-        return jsonResponse.ToObject<CreateExecResponse>();
+        return !string.IsNullOrWhiteSpace(jsonResponse) 
+          ? jsonResponse.ToObject<CreateExecResponse>()
+          : null;
       }
       else {
         var jsonResponse = await response.Content.ReadAsStringAsync();
@@ -103,8 +105,7 @@ namespace MaksIT.PodmanClientDotNet {
 
       if (response.IsSuccessStatusCode) {
         var stringResponse = await response.Content.ReadAsStringAsync();
-        _logger.LogInformation(stringResponse);
-       
+        _logger.LogInformation($"Command executed successfully.\n\n{stringResponse}".Trim());
       }
       else {
         var jsonResponse = await response.Content.ReadAsStringAsync();
@@ -137,7 +138,9 @@ namespace MaksIT.PodmanClientDotNet {
 
       if (response.IsSuccessStatusCode) {
         var jsonResponse = await response.Content.ReadAsStringAsync();
-        return jsonResponse.ToObject<InspectExecResponse>();
+        return !string.IsNullOrWhiteSpace(jsonResponse)
+         ? jsonResponse.ToObject<InspectExecResponse>()
+         : null;
       }
       else {
         var jsonResponse = await response.Content.ReadAsStringAsync();
