@@ -21,7 +21,6 @@ namespace MaksIT.PodmanClientDotNet {
       var response = await _httpClient.PostAsync($"/{_apiVersion}/libpod/images/pull?{query}", null);
       
       if (response.IsSuccessStatusCode) {
-
         var responseStream = await response.Content.ReadAsStreamAsync();
         using (var reader = new StreamReader(responseStream)) {
           string line;
