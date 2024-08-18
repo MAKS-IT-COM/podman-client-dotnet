@@ -15,6 +15,8 @@ public class PodmanClientImagesTests {
     _client = new PodmanClient(logger, "http://wks0002.corp.maks-it.com:8080", 60);
   }
 
+  #region Success Cases
+
   [Fact]
   public async Task PodmanClient_IntegrationTests() {
     // Test 1: Pull Image - Success
@@ -23,6 +25,9 @@ public class PodmanClientImagesTests {
     // Test 2: Tag Image - Success
     await TagImageAsync_Should_Succeed();
   }
+  #endregion
+
+  #region Helper Methods
 
   private async Task PullImageAsync_Should_Succeed() {
     // Arrange
@@ -47,7 +52,9 @@ public class PodmanClientImagesTests {
     // Assert
     Assert.Null(exception); // Expect no exceptions if the tagging was successful
   }
+  #endregion
 
+  #region Fail Cases
   [Fact]
   public async Task PodmanClient_PullImage_Errors() {
 
@@ -76,4 +83,5 @@ public class PodmanClientImagesTests {
     Assert.NotNull(exception); // Expect an exception due to nonexistent image
     Assert.IsType<HttpRequestException>(exception); // Ensure it's the expected type
   }
+  #endregion
 }
