@@ -102,6 +102,13 @@ For detailed documentation on each method, including parameter descriptions and 
 
 Contributions to this project are welcome! Please fork the repository and submit a pull request with your changes. If you encounter any issues or have feature requests, feel free to open an issue on GitHub.
 
+## Contact
+
+If you have any questions or need further assistance, feel free to reach out:
+
+- **Email**: [maksym.sadovnychyy@gmail.com](mailto:maksym.sadovnychyy@gmail.com)
+- **Reddit**: [PodmanClient.DotNet: A .NET Library for Streamlined Podman API Integration](https://www.reddit.com/r/MaksIT/comments/1evel9z/podmanclientdotnet_a_net_library_for_streamlined/?utm_source=share&utm_medium=web3x&utm_name=web3xcss&utm_term=1&utm_content=share_button)
+
 ## License
 
 This project is licensed under the MIT License. See the full license text below.
