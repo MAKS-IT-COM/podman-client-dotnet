@@ -1,12 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace MaksIT.PodmanClientDotNet.Models.Exec {
-  public class CreateExecResponse {
-    public string Id { get; set; }  // The ID of the exec instance
-  }
+namespace MaksIT.PodmanClientDotNet.Models.Exec;
 
+/// <summary>
+/// Libpod API response body for Create Exec response.
+/// </summary>
+
+public class CreateExecResponse {
+  public string? Id { get; set; }
 }

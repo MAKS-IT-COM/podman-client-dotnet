@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema",
+  "title": "Release Package Script Settings",
+  "description": "Invoke-ReleasePackage.ps1 plugin settings for PodmanClient.DotNet.",
+  "plugins": [
+    {
+      "name": "DotNetReleaseVersion",
+      "stageLabel": "build",
+      "enabled": true,
+      "projectFiles": [
+        "..\\..\\..\\src\\PodmanClient\\PodmanClientDotNet.csproj"
+      ]
+    },
+    {
+      "name": "DotNetTest",
+      "stageLabel": "test",
+      "enabled": true,
+      "project": "..\\..\\..\\src\\PodmanClientDotNet.Tests",
+      "resultsDir": "..\\..\\..\\testResults"
+    },
+    {
+      "name": "QualityGate",
+      "stageLabel": "qualityGate",
+      "enabled": true,
+      "coverageThreshold": 0,
+      "failOnVulnerabilities": true,
+      "projectFiles": [
+        "..\\..\\..\\src\\PodmanClient\\PodmanClientDotNet.csproj"
+      ]
+    },
+    {
+      "name": "DotNetPack",
+      "stageLabel": "build",
+      "enabled": true,
+      "projectFiles": [
+        "..\\..\\..\\src\\PodmanClient\\PodmanClientDotNet.csproj"
+      ],
+      "artifactsDir": "..\\..\\..\\release"
+    },
+    {
+      "name": "DotNetCreateArchive",
+      "stageLabel": "build",
+      "enabled": true,
+      "zipNamePattern": "podman-client-dotnet-{version}.zip"
+    },
+    {
+      "name": "ReleasePublishGuard",
+      "stageLabel": "release",
+      "enabled": true,
+      "branches": [
+        "main"
+      ],
+      "requireExactTagOnHead": true,
+      "tagVersionMustMatchDotNetRelease": true,
+      "whenRequirementsNotMet": "skip",
+      "requireCleanWorkingTree": false,
+      "ensureTagOnRemote": true,
+      "remoteName": "origin"
+    },
+    {
+      "name": "GitHub",
+      "stageLabel": "release",
+      "enabled": true,
+      "githubToken": "GITHUB_MAKS_IT_COM",
+      "repository": "https://github.com/MAKS-IT-COM/podman-client-dotnet",
+      "releaseNotesFile": "..\\..\\..\\CHANGELOG.md",
+      "releaseTitlePattern": "Release {version}"
+    },
+    {
+      "name": "DotNetNuGet",
+      "stageLabel": "release",
+      "enabled": true,
+      "nugetApiKey": "NUGET_MAKS_IT",
+      "source": "https://api.nuget.org/v3/index.json"
+    },
+    {
+      "name": "DotNetCleanupArtifacts",
+      "stageLabel": "release",
+      "enabled": true,
+      "includePatterns": [
+        "*"
+      ],
+      "excludePatterns": [
+        "*.zip"
+      ]
+    }
+  ]
+}

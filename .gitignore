@@ -261,6 +261,5 @@ paket-files/
 __pycache__/
 *.pyc
 
-
-**/*docker-compose/LetsEncryptServer/acme
-**/*docker-compose/LetsEncryptServer/cache
+#Custom
+![Uu]tils/**

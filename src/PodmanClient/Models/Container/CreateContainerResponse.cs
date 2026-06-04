@@ -1,13 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace MaksIT.PodmanClientDotNet.Models.Container {
-  public class CreateContainerResponse {
-    public string Id { get; set; }
+namespace MaksIT.PodmanClientDotNet.Models.Container;
 
-    public string[] Warnings { get; set; }
-  }
+/// <summary>
+/// Libpod API response body for Create Container response.
+/// </summary>
+
+public class CreateContainerResponse {
+  public string? Id { get; set; }
+  public string[]? Warnings { get; set; }
 }

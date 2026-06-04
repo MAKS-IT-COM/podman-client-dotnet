@@ -1,54 +1,43 @@
-﻿using ICSharpCode.SharpZipLib.Tar;
+﻿using System.Text;
 
-namespace MaksIT.PodmanClientDotNet.Tests.Archives
-{
-    public static class Tar
-    {
-        public static void CreateTarFromDirectory(string sourceDirectory, Stream outputStream)
-        {
-            using (var tarOutputStream = new TarOutputStream(outputStream))
-            {
-                tarOutputStream.IsStreamOwner = false;
-                AddDirectoryFilesToTar(tarOutputStream, sourceDirectory, true);
-            }
-        }
+using ICSharpCode.SharpZipLib.Tar;
 
-        static void AddDirectoryFilesToTar(TarOutputStream tarOutputStream, string sourceDirectory, bool recursive, string baseDirectory = null)
-        {
-            // If baseDirectory is null, set it to the sourceDirectory to start with
-            if (baseDirectory == null)
-            {
-                baseDirectory = sourceDirectory;
-            }
+namespace MaksIT.PodmanClientDotNet.Tests.Archives;
 
-            var directoryInfo = new DirectoryInfo(sourceDirectory);
+public static class Tar {
+  public static void CreateTarFromDirectory(string sourceDirectory, Stream outputStream) {
+    using var tarOutputStream = new TarOutputStream(outputStream, Encoding.UTF8);
+    tarOutputStream.IsStreamOwner = false;
+    AddDirectoryFilesToTar(tarOutputStream, sourceDirectory, recursive: true);
+  }
 
-            foreach (var fileInfo in directoryInfo.GetFiles())
-            {
-                // Calculate the relative path for the file within the base directory
-                string relativePath = Path.GetRelativePath(baseDirectory, fileInfo.FullName);
+  static void AddDirectoryFilesToTar(
+    TarOutputStream tarOutputStream,
+    string sourceDirectory,
+    bool recursive,
+    string? baseDirectory = null
+  ) {
+    baseDirectory ??= sourceDirectory;
 
-                // Create tar entry with the relative path
-                var entry = TarEntry.CreateEntryFromFile(fileInfo.FullName);
-                entry.Name = relativePath.Replace(Path.DirectorySeparatorChar, '/'); // Use Unix-style path separators
-                tarOutputStream.PutNextEntry(entry);
+    var directoryInfo = new DirectoryInfo(sourceDirectory);
 
-                using (var fileStream = fileInfo.OpenRead())
-                {
-                    fileStream.CopyTo(tarOutputStream);
-                }
+    foreach (var fileInfo in directoryInfo.GetFiles()) {
+      var relativePath = Path.GetRelativePath(baseDirectory, fileInfo.FullName);
 
-                tarOutputStream.CloseEntry();
-            }
+      var entry = TarEntry.CreateEntryFromFile(fileInfo.FullName);
+      entry.Name = relativePath.Replace(Path.DirectorySeparatorChar, '/');
+      tarOutputStream.PutNextEntry(entry);
 
-            if (recursive)
-            {
-                foreach (var subDirectory in directoryInfo.GetDirectories())
-                {
-                    // Recurse into subdirectories, passing the base directory
-                    AddDirectoryFilesToTar(tarOutputStream, subDirectory.FullName, true, baseDirectory);
-                }
-            }
-        }
+      using var fileStream = fileInfo.OpenRead();
+      fileStream.CopyTo(tarOutputStream);
+
+      tarOutputStream.CloseEntry();
     }
+
+    if (!recursive)
+      return;
+
+    foreach (var subDirectory in directoryInfo.GetDirectories())
+      AddDirectoryFilesToTar(tarOutputStream, subDirectory.FullName, recursive: true, baseDirectory);
+  }
 }
