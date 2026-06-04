@@ -1,5 +1,7 @@
 # PodmanClient.DotNet
 
+![Line Coverage](assets/badges/coverage-lines.svg) ![Branch Coverage](assets/badges/coverage-branches.svg) ![Method Coverage](assets/badges/coverage-methods.svg)
+
 ## Description
 
 `PodmanClient.DotNet` is a .NET library designed to provide seamless interaction with the Podman API, allowing developers to manage and control containers directly from their .NET applications. This client library wraps the Podman API endpoints, offering a .NET-friendly interface to perform common container operations such as creating, starting, stopping, deleting containers, and more.
@@ -10,13 +12,12 @@ The primary goal of `PodmanClient.DotNet` is to simplify the integration of Podm
 
 ## Key Features
 
-- **Container Management:** Create, start, stop, and delete containers with straightforward methods.
-- **Image Operations:** Pull, tag, and manage images using the Podman API.
-- **Exec Support:** Execute commands inside running containers, with support for attaching input/output streams.
-- **Volume and Network Management:** Manage container volumes and networks as needed.
-- **Streamlined Error Handling:** Provides detailed error handling, with informative responses based on HTTP status codes.
-- **Customizable HTTP Client:** Easily configure and inject your own `HttpClient` instance for extended control and customization.
+- **Full Libpod API surface:** System, containers, images, volumes, networks, pods, exec, build, manifests, and generate/play/kube (see `IPodmanClient` and domain interfaces under `Abstractions/`).
+- **Domain-oriented API:** `IPodmanContainersClient`, `IPodmanImagesClient`, `IPodmanVolumesClient`, and related interfaces; `IPodmanClient` composes them all.
+- **Structured results:** API methods return `MaksIT.Results.Result` / `Result<T>` instead of throwing on Podman HTTP errors.
+- **Dependency injection:** Register with `AddHttpClient` via `AddPodmanClient` and inject `IPodmanClient`.
 - **Logging Support:** Integrated logging support via `Microsoft.Extensions.Logging` for better observability.
+- **Streaming:** Full-duplex attach/exec sessions (`IPodmanAttachSession`) and NDJSON progress for pull/build (`IPodmanProgressSession<T>`).
 
 ## Installation
 
@@ -28,20 +29,64 @@ dotnet add package PodmanClient.DotNet
 
 ## Usage Examples
 
-### Initialize the PodmanClient
+### Dependency injection (recommended)
+
+`appsettings.json`:
+
+```json
+{
+  "PodmanClient": {
+    "ServerUrl": "http://localhost:8080",
+    "ApiVersion": "v1.41",
+    "TimeoutMinutes": 5
+  }
+}
+```
+
+```csharp
+using MaksIT.PodmanClientDotNet;
+using MaksIT.PodmanClientDotNet.Extensions;
+
+// Host-owned options type (not shipped in this package)
+public sealed class PodmanClientOptions : IPodmanClientConfiguration {
+  public string ServerUrl { get; set; } = string.Empty;
+  public string ApiVersion { get; set; } = "v1.41";
+  public int TimeoutMinutes { get; set; } = 60;
+}
+
+var podmanConfiguration = builder.Configuration
+  .GetSection(IPodmanClientConfiguration.SectionName)
+  .Get<PodmanClientOptions>()
+  ?? throw new InvalidOperationException("PodmanClient configuration is missing.");
+
+builder.Services.AddPodmanClient(podmanConfiguration);
+
+// Inject IPodmanClient where needed
+public sealed class ContainerService(IPodmanClient podman) {
+  public async Task<Result> RunAsync() {
+    var create = await podman.CreateContainerAsync("my-container", "alpine:latest");
+    if (!create.IsSuccess)
+      return create.ToResult();
+
+    return await podman.StartContainerAsync(create.Value!.Id);
+  }
+}
+```
+
+### Manual construction
 
 ```csharp
 using Microsoft.Extensions.Logging;
-using MaksIT.PodmanClient.DotNet;
+using MaksIT.PodmanClientDotNet;
 
 var logger = LoggerFactory.Create(builder => builder.AddConsole()).CreateLogger<PodmanClient>();
-var podmanClient = new PodmanClient(logger, "http://localhost:8080", 5);
+IPodmanClient podmanClient = new PodmanClient(logger, "http://localhost:8080", 5);
 ```
 
 ### Create and Start a Container
 
 ```csharp
-var createResponse = await podmanClient.CreateContainerAsync(
+var createResult = await podmanClient.CreateContainerAsync(
     name: "my-container",
     image: "alpine:latest",
     command: new List<string> { "/bin/sh" },
@@ -49,20 +94,24 @@ var createResponse = await podmanClient.CreateContainerAsync(
     remove: true
 );
 
-await podmanClient.StartContainerAsync(createResponse.Id);
+if (!createResult.IsSuccess)
+  return createResult.ToActionResult(); // in ASP.NET Core controllers
+
+await podmanClient.StartContainerAsync(createResult.Value!.Id);
 ```
 
 ### Execute a Command in a Container
 
 ```csharp
-var execResponse = await podmanClient.CreateExecAsync(createResponse.Id, new[] { "echo", "Hello, World!" });
-await podmanClient.StartExecAsync(execResponse.Id);
+var execResult = await podmanClient.CreateExecAsync(createResult.Value!.Id, new[] { "echo", "Hello, World!" });
+if (execResult.IsSuccess)
+  await podmanClient.StartExecAsync(execResult.Value!.Id);
 ```
 
 ### Pull an Image
 
 ```csharp
-await podmanClient.PullImageAsync("alpine:latest");
+var pullResult = await podmanClient.PullImageAsync("alpine:latest");
 ```
 
 ### Tag an Image
@@ -71,28 +120,60 @@ await podmanClient.PullImageAsync("alpine:latest");
 await podmanClient.TagImageAsync("alpine:latest", "myrepo", "mytag");
 ```
 
+### Full-duplex attach (container or exec)
+
+Use session APIs for multiplexed stdin/stdout/stderr (or raw TTY) instead of a one-shot `Stream`:
+
+```csharp
+var attach = await podmanClient.AttachContainerSessionAsync(
+  containerId, stream: true, stdout: true, stderr: true, stdin: true, tty: false);
+if (!attach.IsSuccess) return;
+
+await using var session = attach.Value!;
+while (await session.ReadFrameAsync() is { } frame)
+  Console.Write(frame.StreamType + ": " + Encoding.UTF8.GetString(frame.Data));
+
+await session.WriteStdinAsync("input"u8.ToArray());
+await session.CloseWriteAsync();
+```
+
+Exec hijack: `CreateExecAsync` → `StartExecSessionAsync(execId, tty: false)`.
+
+Pull/build progress (NDJSON): `PullImageWithProgressAsync` / `BuildImageWithProgressAsync` return `IPodmanProgressSession<T>`; enumerate with `await foreach (var line in session.ReadProgressAsync())`.
+
 ## Available Methods
 
-### `PodmanClient`
+### `IPodmanClient`
 
-- **Container Management**
-  - `Task<CreateContainerResponse> CreateContainerAsync(...)`: Creates a new container.
-  - `Task StartContainerAsync(string containerId, string detachKeys = "ctrl-p,ctrl-q")`: Starts an existing container.
-  - `Task StopContainerAsync(string containerId, int timeout = 10, bool ignoreAlreadyStopped = false)`: Stops a running container.
-  - `Task DeleteContainerAsync(string containerId, bool depend = false, bool ignore = false, int timeout = 10)`: Deletes a container.
-  - `Task ForceDeleteContainerAsync(string containerId, bool deleteVolumes = false, int timeout = 10)`: Forcefully deletes a container, optionally removing associated volumes.
+Register with `AddPodmanClient` or construct `PodmanClient` manually. Methods return `Result` / `Result<T>` from **MaksIT.Results**.
 
-- **Exec Management**
-  - `Task<CreateExecResponse> CreateExecAsync(...)`: Creates an exec instance in a running container.
-  - `Task StartExecAsync(string execId, bool detach = false, bool tty = false, int? height = null, int? width = null)`: Starts an exec instance.
-  - `Task<InspectExecResponse?> InspectExecAsync(string execId)`: Inspects an exec instance to retrieve its details.
+| Interface | Coverage |
+|-----------|----------|
+| `IPodmanSystemClient` | ping, version, info, events, disk usage, system prune |
+| `IPodmanContainersClient` | create, list, inspect, lifecycle, logs, stats, archive, attach, commit, checkpoint, prune, … |
+| `IPodmanImagesClient` | pull, push, list, inspect, tag, untag, search, load, import, export, prune, … |
+| `IPodmanVolumesClient` | create, list, inspect, delete, prune |
+| `IPodmanNetworksClient` | create, list, inspect, delete, connect, disconnect |
+| `IPodmanPodsClient` | create, list, inspect, lifecycle, stats, prune, … |
+| `IPodmanExecClient` | create, start, resize, inspect |
+| `IPodmanBuildClient` | `BuildImageAsync` |
+| `IPodmanManifestsClient` | create, inspect, add, push, delete |
+| `IPodmanGenerateClient` | systemd unit, kube yaml, play kube |
 
-- **Image Operations**
-  - `Task PullImageAsync(...)`: Pulls an image from a container registry.
-  - `Task TagImageAsync(string image, string repo, string tag)`: Tags an existing image with a new repository and tag.
+API responses are typed under `Dtos/` (for example `ContainerInspectDto`, `ImageInspectDto`, `InfoDto`). Request/spec payloads remain in `Models/`.
 
-- **File Operations**
-  - `Task ExtractArchiveToContainerAsync(string containerId, Stream tarStream, string path, bool pause = true)`: Extracts files from a tar stream into a container.
+## Tests
+
+Unit tests cover multiplex framing, attach sessions, NDJSON progress, and a local hijack mock server. Integration tests require a reachable Podman API:
+
+```shell
+$env:PODMAN_TEST_URL = "http://localhost:8080"
+dotnet test src/PodmanClientDotNet.Tests/PodmanClientDotNet.Tests.csproj
+```
+
+Without `PODMAN_TEST_URL` (or `PODMAN_INTEGRATION_URL`), integration tests are skipped automatically. Filter them in CI with `--filter "Category!=Integration"`.
+
+**Note:** Full-duplex attach/exec sessions use a raw TCP hijack connection and do not flow through `HttpClient` delegating handlers (proxy, client certificates, etc.). Configure network access accordingly.
 
 ## Documentation (TODO: Agile)
 
@@ -100,18 +181,11 @@ For detailed documentation on each method, including parameter descriptions and 
 
 ## Contribution
 
-Contributions to this project are welcome! Please fork the repository and submit a pull request with your changes. If you encounter any issues or have feature requests, feel free to open an issue on GitHub.
-
-## Contact
-
-If you have any questions or need further assistance, feel free to reach out:
-
-- **Email**: [maksym.sadovnychyy@gmail.com](mailto:maksym.sadovnychyy@gmail.com)
-- **Reddit**: [PodmanClient.DotNet: A .NET Library for Streamlined Podman API Integration](https://www.reddit.com/r/MaksIT/comments/1evel9z/podmanclientdotnet_a_net_library_for_streamlined/?utm_source=share&utm_medium=web3x&utm_name=web3xcss&utm_term=1&utm_content=share_button)
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for build/test commands, commit format, and PR expectations. Open an issue on GitHub for bugs or feature requests.
 
 ## License
 
-This project is licensed under the MIT License. See the full license text below.
+This project is licensed under the MIT License. See [LICENSE.md](LICENSE.md).
 
 ---
 
@@ -143,4 +217,5 @@ SOFTWARE.
 
 ## Contact
 
-For any questions or inquiries, please reach out via GitHub or [email](mailto:maksym.sadovnychyy@gmail.com).
+- **Email**: [maksym.sadovnychyy@gmail.com](mailto:maksym.sadovnychyy@gmail.com)
+- **Reddit**: [PodmanClient.DotNet: A .NET Library for Streamlined Podman API Integration](https://www.reddit.com/r/MaksIT/comments/1evel9z/podmanclientdotnet_a_net_library_for_streamlined/?utm_source=share&utm_medium=web3x&utm_name=web3xcss&utm_term=1&utm_content=share_button)

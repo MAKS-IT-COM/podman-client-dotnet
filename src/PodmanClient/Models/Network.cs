@@ -1,13 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace MaksIT.PodmanClientDotNet.Models {
-  public class Network {
-    public int ClassID { get; set; }
-    public List<NetworkPriority> Priorities { get; set; }
-  }
+namespace MaksIT.PodmanClientDotNet.Models;
 
+/// <summary>
+/// Linux network resource limits (class ID and priorities) for container creation.
+/// </summary>
+public class LinuxNetwork {
+  public int ClassID { get; set; }
+  public List<NetworkPriority>? Priorities { get; set; }
 }

@@ -1,28 +1,67 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>MaksIT.$(MSBuildProjectName.Replace(" ", "_"))</RootNamespace>
 
+    <!-- Enable XML documentation -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+
     <!-- NuGet package metadata -->
     <PackageId>PodmanClient.DotNet</PackageId>
-    <Version>1.0.4</Version>
+    <Version>1.1.0</Version>
     <Authors>Maksym Sadovnychyy</Authors>
     <Company>MAKS-IT</Company>
     <Product>PodmanClient.DotNet</Product>
-    <Description>Podman API client .NET implementation</Description>
-    <PackageTags>podman client dotnet</PackageTags>
+    <Copyright>Copyright © Maksym Sadovnychyy (MAKS-IT)</Copyright>
+    <Description>Podman API client for .NET — manage containers, images, exec sessions, and archives via the Podman REST API.</Description>
+    <PackageTags>podman;container;docker;client;dotnet;api</PackageTags>
+
+    <PackageProjectUrl>https://github.com/MAKS-IT-COM/podman-client-dotnet</PackageProjectUrl>
     <RepositoryUrl>https://github.com/MAKS-IT-COM/podman-client-dotnet</RepositoryUrl>
-    <License>MIT</License>
-    <RequireLicenseAcceptance>false</RequireLicenseAcceptance>
+    <RepositoryType>git</RepositoryType>
+
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseFile>LICENSE.md</PackageLicenseFile>
+    <PackageReleaseNotes>See https://github.com/MAKS-IT-COM/podman-client-dotnet/releases</PackageReleaseNotes>
+
+    <RequireLicenseAcceptance>false</RequireLicenseAcceptance>
+
+    <!-- Source Link for debugging -->
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+
+    <!-- Deterministic builds for reproducibility -->
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />
-    <None Include="../../README.md" Pack="true" PackagePath="" />
+    <InternalsVisibleTo Include="PodmanClientDotNet.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MaksIT.Core" Version="1.6.7" />
+    <PackageReference Include="MaksIT.Results" Version="2.0.2" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.8" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\LICENSE.md" Pack="true" PackagePath="\" Link="LICENSE.md" />
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" Link="README.md" />
+    <None Include="..\..\CHANGELOG.md" Pack="true" PackagePath="\" Link="CHANGELOG.md" />
+
+    <None Include="..\..\assets\badges\**\*" Link="assets\badges\%(RecursiveDir)%(Filename)%(Extension)">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>

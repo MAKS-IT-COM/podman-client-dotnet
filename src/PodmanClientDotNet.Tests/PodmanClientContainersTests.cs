@@ -1,149 +1,126 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using MaksIT.PodmanClientDotNet.Tests.Archives;
 
-using MaksIT.PodmanClientDotNet.Tests.Archives;
+namespace MaksIT.PodmanClientDotNet.Tests;
 
-namespace MaksIT.PodmanClientDotNet.Tests {
-  public class PodmanClientContainersTests {
-    private readonly PodmanClient _client;
+[Trait("Category", "Integration")]
+public class PodmanClientContainersTests {
+  private readonly IPodmanClient _client = PodmanClientTestFixture.CreateClient();
 
-    public PodmanClientContainersTests() {
-      // Initialize the logger
-      var loggerFactory = LoggerFactory.Create(builder => builder.AddConsole());
-      var logger = loggerFactory.CreateLogger<PodmanClient>();
+  #region Success Cases
+  [Fact]
+  public async Task PodmanClient_ContainerLifecycle_Success() {
+    string containerName = $"podman-client-test-{Guid.NewGuid()}";
+    string image = "alpine:latest";
 
-      // Initialize PodmanClient with real HttpClient
-      _client = new PodmanClient(logger, "http://wks0002.corp.maks-it.com:8080", 60);
-    }
+    await PullImageAsync(image);
+    var containerId = await CreateContainerAsync(containerName, image);
+    await StartContainerAsync(containerId);
+    await StopContainerAsync(containerId);
+    await ForceDeleteContainerAsync(containerId);
+  }
 
-    #region Success Cases
-    [Fact]
-    public async Task PodmanClient_ContainerLifecycle_Success() {
-      // Arrange
-      string containerName = $"podman-client-test-{Guid.NewGuid()}";
-      string image = "alpine:latest";
+  [Fact]
+  public async Task CopyFilesToContainer_Success() {
+    string containerName = $"podman-client-test-{Guid.NewGuid()}";
+    string image = "alpine:latest";
+    string pathInContainer = "/podman-test-copy";
+    string tempFolderPath = CreateTemporaryFolderWithFiles();
 
-      // Act & Assert
+    try {
       await PullImageAsync(image);
       var containerId = await CreateContainerAsync(containerName, image);
       await StartContainerAsync(containerId);
+
+      using var tarStream = CreateTarStream(tempFolderPath);
+      await CopyToContainerAsync(containerId, tarStream, pathInContainer);
+
       await StopContainerAsync(containerId);
       await ForceDeleteContainerAsync(containerId);
     }
-
-    [Fact]
-    public async Task CopyFilesToContainer_Success() {
-      // Arrange
-      string containerName = $"podman-client-test-{Guid.NewGuid()}";
-      string image = "alpine:latest";
-      string pathInContainer = "/podman-test-copy";
-
-      // Create temporary folder with random files
-      string tempFolderPath = CreateTemporaryFolderWithFiles();
-
-      try {
-        // Act
-        await PullImageAsync(image);
-        var containerId = await CreateContainerAsync(containerName, image);
-        await StartContainerAsync(containerId);
-
-        // Archive the folder and copy to container
-        using (var tarStream = CreateTarStream(tempFolderPath)) {
-          await CopyToContainerAsync(containerId, tarStream, pathInContainer);
-        }
-
-        // Stop and delete the container
-        await StopContainerAsync(containerId);
-        await ForceDeleteContainerAsync(containerId);
-      }
-      finally {
-        // Cleanup: Delete temporary folder
-        if (Directory.Exists(tempFolderPath)) {
-          Directory.Delete(tempFolderPath, true);
-        }
-      }
+    finally {
+      if (Directory.Exists(tempFolderPath))
+        Directory.Delete(tempFolderPath, true);
     }
-    #endregion
-
-    #region Helper Methods
-    private async Task PullImageAsync(string image) {
-      var exception = await Record.ExceptionAsync(() => _client.PullImageAsync(image));
-      Assert.Null(exception); // Expect no exceptions if the pull was successful
-    }
-
-    private async Task<string> CreateContainerAsync(string containerName, string image) {
-      var createResponse = await _client.CreateContainerAsync(
-        name: containerName,
-        image: image,
-        command: new List<string> {
-          "sh", "-c",
-          "sleep infinity"
-        });
-      Assert.NotNull(createResponse);
-      Assert.False(string.IsNullOrEmpty(createResponse.Id)); // Ensure a valid container ID is returned
-      return createResponse.Id;
-    }
-
-    private async Task StartContainerAsync(string containerId) {
-      var exception = await Record.ExceptionAsync(() => _client.StartContainerAsync(containerId));
-      Assert.Null(exception); // Expect no exceptions if the container was started successfully
-    }
-
-    private async Task StopContainerAsync(string containerId) {
-      var exception = await Record.ExceptionAsync(() => _client.StopContainerAsync(containerId));
-      Assert.Null(exception); // Expect no exceptions if the container was stopped successfully
-    }
-
-    private async Task ForceDeleteContainerAsync(string containerId) {
-      var exception = await Record.ExceptionAsync(() => _client.ForceDeleteContainerAsync(containerId));
-      Assert.Null(exception); // Expect no exceptions if the container was deleted successfully
-    }
-
-    private async Task CopyToContainerAsync(string containerId, Stream tarStream, string path) {
-      var exception = await Record.ExceptionAsync(() => _client.ExtractArchiveToContainerAsync(containerId, tarStream, path));
-      Assert.Null(exception); // Expect no exceptions if the copy was successful
-    }
-
-    private string CreateTemporaryFolderWithFiles() {
-      string tempFolder = Path.Combine(Path.GetTempPath(), $"podman-test-{Guid.NewGuid()}");
-      Directory.CreateDirectory(tempFolder);
-
-      // Create some random files
-      for (int i = 0; i < 5; i++) {
-        File.WriteAllText(Path.Combine(tempFolder, $"test-file-{i}.txt"), $"This is test file {i}");
-      }
-
-      return tempFolder;
-    }
-
-    private Stream CreateTarStream(string folderPath) {
-      var memoryStream = new MemoryStream();
-      Tar.CreateTarFromDirectory(folderPath, memoryStream);
-      memoryStream.Seek(0, SeekOrigin.Begin); // Reset the stream position for reading
-      return memoryStream;
-    }
-    #endregion
-
-    #region Fail Cases
-    [Fact]
-    public async Task StartContainerAsync_Should_HandleErrors() {
-      string invalidContainerId = "invalid-container-id";
-      var exception = await Record.ExceptionAsync(() => _client.StartContainerAsync(invalidContainerId));
-      Assert.NotNull(exception); // Expect an exception due to invalid container ID
-    }
-
-    [Fact]
-    public async Task StopContainerAsync_Should_HandleErrors() {
-      string invalidContainerId = "invalid-container-id";
-      var exception = await Record.ExceptionAsync(() => _client.StopContainerAsync(invalidContainerId));
-      Assert.NotNull(exception); // Expect an exception due to invalid container ID
-    }
-
-    [Fact]
-    public async Task ForceDeleteContainerAsync_Should_HandleErrors() {
-      string invalidContainerId = "invalid-container-id";
-      var exception = await Record.ExceptionAsync(() => _client.ForceDeleteContainerAsync(invalidContainerId));
-      Assert.NotNull(exception); // Expect an exception due to invalid container ID
-    }
-    #endregion
   }
+  #endregion
+
+  #region Helper Methods
+  private async Task PullImageAsync(string image) {
+    var result = await _client.PullImageAsync(image);
+    PodmanClientTestFixture.AssertSuccess(result);
+  }
+
+  private async Task<string> CreateContainerAsync(string containerName, string image) {
+    var result = await _client.CreateContainerAsync(
+      name: containerName,
+      image: image,
+      command: new List<string> { "sh", "-c", "sleep infinity" });
+
+    string? containerId = null;
+    PodmanClientTestFixture.AssertSuccess(result, value => {
+      Assert.NotNull(value);
+      Assert.False(string.IsNullOrEmpty(value!.Id));
+      containerId = value.Id;
+    });
+
+    return containerId!;
+  }
+
+  private async Task StartContainerAsync(string containerId) {
+    var result = await _client.StartContainerAsync(containerId);
+    PodmanClientTestFixture.AssertSuccess(result);
+  }
+
+  private async Task StopContainerAsync(string containerId) {
+    var result = await _client.StopContainerAsync(containerId);
+    PodmanClientTestFixture.AssertSuccess(result);
+  }
+
+  private async Task ForceDeleteContainerAsync(string containerId) {
+    var result = await _client.ForceDeleteContainerAsync(containerId);
+    PodmanClientTestFixture.AssertSuccess(result);
+  }
+
+  private async Task CopyToContainerAsync(string containerId, Stream tarStream, string path) {
+    var result = await _client.ExtractArchiveToContainerAsync(containerId, tarStream, path);
+    PodmanClientTestFixture.AssertSuccess(result);
+  }
+
+  private static string CreateTemporaryFolderWithFiles() {
+    string tempFolder = Path.Combine(Path.GetTempPath(), $"podman-test-{Guid.NewGuid()}");
+    Directory.CreateDirectory(tempFolder);
+
+    for (int i = 0; i < 5; i++)
+      File.WriteAllText(Path.Combine(tempFolder, $"test-file-{i}.txt"), $"This is test file {i}");
+
+    return tempFolder;
+  }
+
+  private static Stream CreateTarStream(string folderPath) {
+    var memoryStream = new MemoryStream();
+    Tar.CreateTarFromDirectory(folderPath, memoryStream);
+    memoryStream.Seek(0, SeekOrigin.Begin);
+    return memoryStream;
+  }
+  #endregion
+
+  #region Fail Cases
+  [Fact]
+  public async Task StartContainerAsync_Should_HandleErrors() {
+    var result = await _client.StartContainerAsync("invalid-container-id");
+    PodmanClientTestFixture.AssertFailure(result);
+  }
+
+  [Fact]
+  public async Task StopContainerAsync_Should_HandleErrors() {
+    var result = await _client.StopContainerAsync("invalid-container-id");
+    PodmanClientTestFixture.AssertFailure(result);
+  }
+
+  [Fact]
+  public async Task ForceDeleteContainerAsync_Should_HandleErrors() {
+    var result = await _client.ForceDeleteContainerAsync("invalid-container-id");
+    PodmanClientTestFixture.AssertFailure(result);
+  }
+  #endregion
 }

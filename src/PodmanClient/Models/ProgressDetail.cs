@@ -1,12 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace MaksIT.PodmanClientDotNet.Models {
-  public class ProgressDetail {
-    public long? Current { get; set; }
-    public long? Total { get; set; }
-  }
+namespace MaksIT.PodmanClientDotNet.Models;
+
+/// <summary>
+/// Libpod container or image specification model (Progress Detail).
+/// </summary>
+
+public class ProgressDetail {
+  public long? Current { get; set; }
+  public long? Total { get; set; }
 }

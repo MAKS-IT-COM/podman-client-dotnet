@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="PodmanClientDotNet.Tests/PodmanClientDotNet.Tests.csproj" />
+  <Project Path="PodmanClient/PodmanClientDotNet.csproj" />
+</Solution>
