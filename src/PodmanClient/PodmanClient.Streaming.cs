@@ -1,8 +1,9 @@
+using MaksIT.PodmanClientDotNet;
 using System.Text;
+using System.Text.Json;
 
 using Microsoft.Extensions.Logging;
 
-using MaksIT.Core.Extensions;
 using MaksIT.PodmanClientDotNet.Dtos.Build;
 using MaksIT.PodmanClientDotNet.Dtos.Image;
 using MaksIT.PodmanClientDotNet.Internal;
@@ -65,7 +66,7 @@ public partial class PodmanClient {
         Height = height,
         Width = width,
       };
-      var body = Encoding.UTF8.GetBytes(startExecRequest.ToJson());
+      var body = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(startExecRequest, PodmanJsonContext.Default.StartExecRequest));
       var query = BuildQuery([]);
 
       var hijack = await PodmanHijackConnection.ConnectAsync(
@@ -122,7 +123,7 @@ public partial class PodmanClient {
       return streamResult.ToResultOfType<IPodmanProgressSession<PullImageResponseDto>>(null!);
 
     return Result<IPodmanProgressSession<PullImageResponseDto>?>.Ok(
-      new PodmanProgressSession<PullImageResponseDto>(streamResult.Value!)
+      new PodmanProgressSession<PullImageResponseDto>(streamResult.Value!, PodmanJsonContext.Default.PullImageResponseDto)
     );
   }
 
@@ -169,7 +170,7 @@ public partial class PodmanClient {
       return streamResult.ToResultOfType<IPodmanProgressSession<BuildProgressLineDto>>(null!);
 
     return Result<IPodmanProgressSession<BuildProgressLineDto>?>.Ok(
-      new PodmanProgressSession<BuildProgressLineDto>(streamResult.Value!)
+      new PodmanProgressSession<BuildProgressLineDto>(streamResult.Value!, PodmanJsonContext.Default.BuildProgressLineDto)
     );
   }
 

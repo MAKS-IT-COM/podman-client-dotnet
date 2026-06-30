@@ -1,8 +1,8 @@
-using System.Text;
+using MaksIT.PodmanClientDotNet;
+using System.Text.Json;
 
 using Microsoft.Extensions.Logging;
 
-using MaksIT.Core.Extensions;
 using MaksIT.PodmanClientDotNet.Internal;
 using MaksIT.PodmanClientDotNet.Models;
 using MaksIT.PodmanClientDotNet.Dtos.Exec;
@@ -39,7 +39,9 @@ public partial class PodmanClient {
     return await PostJsonAsync<CreateExecRequest, CreateExecResponseDto>(
       $"/libpod/containers/{Uri.EscapeDataString(containerName)}/exec",
       "Create exec",
-      execRequest
+      execRequest,
+      PodmanJsonContext.Default.CreateExecRequest,
+      PodmanJsonContext.Default.CreateExecResponseDto
     ).ConfigureAwait(false);
   }
 
@@ -60,7 +62,8 @@ public partial class PodmanClient {
     var result = await PostJsonWithoutBodyAsync<StartExecRequest>(
       $"/libpod/exec/{Uri.EscapeDataString(execId)}/start",
       "Start exec",
-      startExecRequest
+      startExecRequest,
+      PodmanJsonContext.Default.StartExecRequest
     ).ConfigureAwait(false);
 
     if (result.IsSuccess)
@@ -72,7 +75,8 @@ public partial class PodmanClient {
   public Task<Result<InspectExecResponseDto?>> InspectExecAsync(string execId) =>
     GetJsonAsync<InspectExecResponseDto>(
       $"/libpod/exec/{Uri.EscapeDataString(execId)}/json",
-      "Inspect exec"
+      "Inspect exec",
+      PodmanJsonContext.Default.InspectExecResponseDto
     );
 
   public Task<Result> ResizeExecAsync(string execId, int height, int width, CancellationToken cancellationToken = default) =>

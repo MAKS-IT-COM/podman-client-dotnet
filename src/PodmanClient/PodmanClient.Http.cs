@@ -1,7 +1,8 @@
 using System.Net;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
 
-using MaksIT.Core.Extensions;
 using MaksIT.PodmanClientDotNet.Internal;
 using MaksIT.Results;
 
@@ -55,13 +56,14 @@ public partial class PodmanClient {
   internal Task<Result<T?>> GetJsonAsync<T>(
     string libpodPath,
     string operation,
+    JsonTypeInfo<T> typeInfo,
     IEnumerable<(string Key, string? Value)>? query = null,
     CancellationToken cancellationToken = default
   ) =>
     SendAsync<T>(
       () => _httpClient.GetAsync(LibpodPath(libpodPath) + BuildQuery(query ?? []), cancellationToken),
       operation,
-      body => body.ToObject<T>(),
+      body => JsonSerializer.Deserialize(body, typeInfo),
       cancellationToken
     );
 
@@ -81,17 +83,19 @@ public partial class PodmanClient {
     string libpodPath,
     string operation,
     TRequest? requestBody,
+    JsonTypeInfo<TRequest> requestTypeInfo,
+    JsonTypeInfo<TResponse> responseTypeInfo,
     IEnumerable<(string Key, string? Value)>? query = null,
     CancellationToken cancellationToken = default
   ) {
     var content = requestBody is null
       ? null
-      : new StringContent(requestBody.ToJson(), Encoding.UTF8, "application/json");
+      : new StringContent(JsonSerializer.Serialize(requestBody, requestTypeInfo), Encoding.UTF8, "application/json");
 
     return SendAsync<TResponse>(
       () => _httpClient.PostAsync(LibpodPath(libpodPath) + BuildQuery(query ?? []), content, cancellationToken),
       operation,
-      body => string.IsNullOrWhiteSpace(body) ? default : body.ToObject<TResponse>(),
+      body => string.IsNullOrWhiteSpace(body) ? default : JsonSerializer.Deserialize(body, responseTypeInfo),
       cancellationToken
     );
   }
@@ -100,12 +104,13 @@ public partial class PodmanClient {
     string libpodPath,
     string operation,
     TRequest? requestBody,
+    JsonTypeInfo<TRequest> requestTypeInfo,
     IEnumerable<(string Key, string? Value)>? query = null,
     CancellationToken cancellationToken = default
   ) {
     var content = requestBody is null
       ? null
-      : new StringContent(requestBody.ToJson(), Encoding.UTF8, "application/json");
+      : new StringContent(JsonSerializer.Serialize(requestBody, requestTypeInfo), Encoding.UTF8, "application/json");
 
     return SendWithoutBodyAsync(
       () => _httpClient.PostAsync(LibpodPath(libpodPath) + BuildQuery(query ?? []), content, cancellationToken),
@@ -155,6 +160,7 @@ public partial class PodmanClient {
   internal Task<Result<TResponse?>> PostLibpodAsync<TResponse>(
     string libpodPath,
     string operation,
+    JsonTypeInfo<TResponse> responseTypeInfo,
     HttpContent? content = null,
     IEnumerable<(string Key, string? Value)>? query = null,
     CancellationToken cancellationToken = default
@@ -162,20 +168,21 @@ public partial class PodmanClient {
     SendAsync<TResponse>(
       () => _httpClient.PostAsync(LibpodPath(libpodPath) + BuildQuery(query ?? []), content, cancellationToken),
       operation,
-      body => string.IsNullOrWhiteSpace(body) ? default : body.ToObject<TResponse>(),
+      body => string.IsNullOrWhiteSpace(body) ? default : JsonSerializer.Deserialize(body, responseTypeInfo),
       cancellationToken
     );
 
   internal Task<Result<T?>> DeleteJsonAsync<T>(
     string libpodPath,
     string operation,
+    JsonTypeInfo<T> typeInfo,
     IEnumerable<(string Key, string? Value)>? query = null,
     CancellationToken cancellationToken = default
   ) =>
     SendAsync<T>(
       () => _httpClient.DeleteAsync(LibpodPath(libpodPath) + BuildQuery(query ?? []), cancellationToken),
       operation,
-      body => string.IsNullOrWhiteSpace(body) ? default : body.ToObject<T>(),
+      body => string.IsNullOrWhiteSpace(body) ? default : JsonSerializer.Deserialize(body, typeInfo),
       cancellationToken
     );
 

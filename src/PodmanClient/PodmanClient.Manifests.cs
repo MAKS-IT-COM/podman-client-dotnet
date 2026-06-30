@@ -1,3 +1,4 @@
+using MaksIT.PodmanClientDotNet;
 using MaksIT.PodmanClientDotNet.Dtos.Manifest;
 using MaksIT.Results;
 
@@ -13,6 +14,7 @@ public partial class PodmanClient {
     PostLibpodAsync<ManifestCreateDto>(
       "/libpod/manifests/create",
       "Create manifest",
+      PodmanJsonContext.Default.ManifestCreateDto,
       query: [
         ("name", name),
         ("image", image),
@@ -30,10 +32,10 @@ public partial class PodmanClient {
     );
 
   public Task<Result<ManifestInspectDto?>> InspectManifestAsync(string name, CancellationToken cancellationToken = default) =>
-    GetJsonAsync<ManifestInspectDto>($"{ManifestPath(name)}/json", "Inspect manifest", cancellationToken: cancellationToken);
+    GetJsonAsync<ManifestInspectDto>($"{ManifestPath(name)}/json", "Inspect manifest", PodmanJsonContext.Default.ManifestInspectDto, cancellationToken: cancellationToken);
 
   public Task<Result> AddToManifestAsync(string name, ManifestAddRequestDto request, CancellationToken cancellationToken = default) =>
-    PostJsonWithoutBodyAsync($"{ManifestPath(name)}/add", "Add to manifest", request, cancellationToken: cancellationToken);
+    PostJsonWithoutBodyAsync($"{ManifestPath(name)}/add", "Add to manifest", request, PodmanJsonContext.Default.ManifestAddRequestDto, cancellationToken: cancellationToken);
 
   public Task<Result> PushManifestAsync(
     string name,
