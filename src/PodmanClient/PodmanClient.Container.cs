@@ -1,8 +1,9 @@
+using MaksIT.PodmanClientDotNet;
 using System.Net;
+using System.Text.Json;
 
 using Microsoft.Extensions.Logging;
 
-using MaksIT.Core.Extensions;
 using MaksIT.PodmanClientDotNet.Internal;
 using MaksIT.PodmanClientDotNet.Models;
 using MaksIT.PodmanClientDotNet.Dtos.Container;
@@ -251,7 +252,9 @@ public partial class PodmanClient {
     return await PostJsonAsync<CreateContainerRequest, CreateContainerResponseDto>(
       "/libpod/containers/create",
       "Create container",
-      createContainerParameters
+      createContainerParameters,
+      PodmanJsonContext.Default.CreateContainerRequest,
+      PodmanJsonContext.Default.CreateContainerResponseDto
     ).ConfigureAwait(false);
   }
 
@@ -314,7 +317,7 @@ public partial class PodmanClient {
 
     if (response.IsSuccessStatusCode) {
       var value = !string.IsNullOrWhiteSpace(jsonResponse)
-        ? jsonResponse.ToObject<DeleteContainerResponseDto[]>()
+        ? JsonSerializer.Deserialize(jsonResponse, PodmanJsonContext.Default.DeleteContainerResponseDtoArray)
         : null;
       return PodmanHttpResults.Success(response.StatusCode, value);
     }
@@ -336,7 +339,7 @@ public partial class PodmanClient {
 
     if (response.IsSuccessStatusCode) {
       var value = !string.IsNullOrWhiteSpace(jsonResponse)
-        ? jsonResponse.ToObject<DeleteContainerResponseDto[]>()
+        ? JsonSerializer.Deserialize(jsonResponse, PodmanJsonContext.Default.DeleteContainerResponseDtoArray)
         : null;
       return PodmanHttpResults.Success(response.StatusCode, value);
     }

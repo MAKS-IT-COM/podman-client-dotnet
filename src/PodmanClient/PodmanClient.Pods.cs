@@ -1,3 +1,4 @@
+using MaksIT.PodmanClientDotNet;
 using MaksIT.PodmanClientDotNet.Dtos.Common;
 using MaksIT.PodmanClientDotNet.Dtos.Pod;
 using MaksIT.PodmanClientDotNet.Models.Pod;
@@ -5,18 +6,19 @@ using MaksIT.Results;
 
 public partial class PodmanClient {
   public Task<Result<PodListEntryDto?>> CreatePodAsync(PodCreateRequest request, CancellationToken cancellationToken = default) =>
-    PostJsonAsync<PodCreateRequest, PodListEntryDto>("/libpod/pods/create", "Create pod", request, cancellationToken: cancellationToken);
+    PostJsonAsync<PodCreateRequest, PodListEntryDto>("/libpod/pods/create", "Create pod", request, PodmanJsonContext.Default.PodCreateRequest, PodmanJsonContext.Default.PodListEntryDto, cancellationToken: cancellationToken);
 
   public Task<Result<List<PodListEntryDto>?>> ListPodsAsync(bool all = false, CancellationToken cancellationToken = default) =>
     GetJsonAsync<List<PodListEntryDto>>(
       "/libpod/pods/json",
       "List pods",
+      PodmanJsonContext.Default.ListPodListEntryDto,
       [("all", all.ToString().ToLowerInvariant())],
       cancellationToken
     );
 
   public Task<Result<PodInspectDto?>> InspectPodAsync(string name, CancellationToken cancellationToken = default) =>
-    GetJsonAsync<PodInspectDto>($"/libpod/pods/{Uri.EscapeDataString(name)}/json", "Inspect pod", cancellationToken: cancellationToken);
+    GetJsonAsync<PodInspectDto>($"/libpod/pods/{Uri.EscapeDataString(name)}/json", "Inspect pod", PodmanJsonContext.Default.PodInspectDto, cancellationToken: cancellationToken);
 
   public Task<Result> PodExistsAsync(string name, CancellationToken cancellationToken = default) =>
     GetWithoutBodyAsync($"/libpod/pods/{Uri.EscapeDataString(name)}/exists", "Pod exists", cancellationToken: cancellationToken);
@@ -63,11 +65,11 @@ public partial class PodmanClient {
     PostWithoutBodyAsync($"/libpod/pods/{Uri.EscapeDataString(name)}/unpause", "Unpause pod", cancellationToken: cancellationToken);
 
   public Task<Result<PruneReportDto?>> PrunePodsAsync(CancellationToken cancellationToken = default) =>
-    PostLibpodAsync<PruneReportDto>("/libpod/pods/prune", "Prune pods", cancellationToken: cancellationToken);
+    PostLibpodAsync<PruneReportDto>("/libpod/pods/prune", "Prune pods", PodmanJsonContext.Default.PruneReportDto, cancellationToken: cancellationToken);
 
   public Task<Result<PodTopDto?>> TopPodAsync(string name, CancellationToken cancellationToken = default) =>
-    GetJsonAsync<PodTopDto>($"/libpod/pods/{Uri.EscapeDataString(name)}/top", "Top pod", cancellationToken: cancellationToken);
+    GetJsonAsync<PodTopDto>($"/libpod/pods/{Uri.EscapeDataString(name)}/top", "Top pod", PodmanJsonContext.Default.PodTopDto, cancellationToken: cancellationToken);
 
   public Task<Result<PodStatsResponseDto?>> GetPodsStatsAsync(CancellationToken cancellationToken = default) =>
-    GetJsonAsync<PodStatsResponseDto>("/libpod/pods/stats", "Get pods stats", cancellationToken: cancellationToken);
+    GetJsonAsync<PodStatsResponseDto>("/libpod/pods/stats", "Get pods stats", PodmanJsonContext.Default.PodStatsResponseDto, cancellationToken: cancellationToken);
 }

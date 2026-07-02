@@ -1,15 +1,16 @@
 using System.Text.Json;
-
-using MaksIT.Core.Extensions;
+using System.Text.Json.Serialization.Metadata;
 
 namespace MaksIT.PodmanClientDotNet.Streaming;
 
 internal sealed class PodmanProgressSession<T> : IPodmanProgressSession<T> {
   private readonly Stream _stream;
   private readonly bool _ownsStream;
+  private readonly JsonTypeInfo<T> _typeInfo;
 
-  internal PodmanProgressSession(Stream stream, bool ownsStream = true) {
+  internal PodmanProgressSession(Stream stream, JsonTypeInfo<T> typeInfo, bool ownsStream = true) {
     _stream = stream ?? throw new ArgumentNullException(nameof(stream));
+    _typeInfo = typeInfo ?? throw new ArgumentNullException(nameof(typeInfo));
     _ownsStream = ownsStream;
   }
 
@@ -24,7 +25,7 @@ internal sealed class PodmanProgressSession<T> : IPodmanProgressSession<T> {
 
       T? item;
       try {
-        item = line.ToObject<T>();
+        item = JsonSerializer.Deserialize(line, _typeInfo);
       }
       catch (JsonException) {
         continue;

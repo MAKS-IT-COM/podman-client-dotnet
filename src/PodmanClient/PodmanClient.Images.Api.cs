@@ -1,3 +1,4 @@
+using MaksIT.PodmanClientDotNet;
 using System.Net.Http.Headers;
 
 using MaksIT.PodmanClientDotNet.Dtos.Common;
@@ -16,6 +17,7 @@ public partial class PodmanClient {
     GetJsonAsync<List<ImageListEntryDto>>(
       "/libpod/images/json",
       "List images",
+      PodmanJsonContext.Default.ListImageListEntryDto,
       [
         ("all", all.ToString().ToLowerInvariant()),
         ("filters", filters),
@@ -24,7 +26,7 @@ public partial class PodmanClient {
     );
 
   public Task<Result<ImageInspectDto?>> InspectImageAsync(string name, CancellationToken cancellationToken = default) =>
-    GetJsonAsync<ImageInspectDto>($"{ImagePath(name)}/json", "Inspect image", cancellationToken: cancellationToken);
+    GetJsonAsync<ImageInspectDto>($"{ImagePath(name)}/json", "Inspect image", PodmanJsonContext.Default.ImageInspectDto, cancellationToken: cancellationToken);
 
   public Task<Result> ImageExistsAsync(string name, CancellationToken cancellationToken = default) =>
     GetWithoutBodyAsync($"{ImagePath(name)}/exists", "Image exists", cancellationToken: cancellationToken);
@@ -33,6 +35,7 @@ public partial class PodmanClient {
     DeleteJsonAsync<ImageDeleteDto[]>(
       ImagePath(name),
       "Delete image",
+      PodmanJsonContext.Default.ImageDeleteDtoArray,
       [("force", force.ToString().ToLowerInvariant())],
       cancellationToken
     );
@@ -50,11 +53,11 @@ public partial class PodmanClient {
     foreach (var image in images)
       query.Add(("images", image));
 
-    return DeleteJsonAsync<ImageDeleteDto[]>("/libpod/images/remove", "Remove images", query, cancellationToken);
+    return DeleteJsonAsync<ImageDeleteDto[]>("/libpod/images/remove", "Remove images", PodmanJsonContext.Default.ImageDeleteDtoArray, query, cancellationToken);
   }
 
   public Task<Result<PruneReportDto?>> PruneImagesAsync(CancellationToken cancellationToken = default) =>
-    PostLibpodAsync<PruneReportDto>("/libpod/images/prune", "Prune images", cancellationToken: cancellationToken);
+    PostLibpodAsync<PruneReportDto>("/libpod/images/prune", "Prune images", PodmanJsonContext.Default.PruneReportDto, cancellationToken: cancellationToken);
 
   public Task<Result<List<ImageSearchResultDto>?>> SearchImagesAsync(
     string term,
@@ -64,6 +67,7 @@ public partial class PodmanClient {
     GetJsonAsync<List<ImageSearchResultDto>>(
       "/libpod/images/search",
       "Search images",
+      PodmanJsonContext.Default.ListImageSearchResultDto,
       [
         ("term", term),
         ("limit", limit?.ToString()),
@@ -115,13 +119,13 @@ public partial class PodmanClient {
     );
 
   public Task<Result<List<ImageHistoryEntryDto>?>> GetImageHistoryAsync(string name, CancellationToken cancellationToken = default) =>
-    GetJsonAsync<List<ImageHistoryEntryDto>>($"{ImagePath(name)}/history", "Get image history", cancellationToken: cancellationToken);
+    GetJsonAsync<List<ImageHistoryEntryDto>>($"{ImagePath(name)}/history", "Get image history", PodmanJsonContext.Default.ListImageHistoryEntryDto, cancellationToken: cancellationToken);
 
   public Task<Result<ImageTreeDto?>> GetImageTreeAsync(string name, CancellationToken cancellationToken = default) =>
-    GetJsonAsync<ImageTreeDto>($"{ImagePath(name)}/tree", "Get image tree", cancellationToken: cancellationToken);
+    GetJsonAsync<ImageTreeDto>($"{ImagePath(name)}/tree", "Get image tree", PodmanJsonContext.Default.ImageTreeDto, cancellationToken: cancellationToken);
 
   public Task<Result<ImageChangesDto?>> GetImageChangesAsync(string name, CancellationToken cancellationToken = default) =>
-    GetJsonAsync<ImageChangesDto>($"{ImagePath(name)}/changes", "Get image changes", cancellationToken: cancellationToken);
+    GetJsonAsync<ImageChangesDto>($"{ImagePath(name)}/changes", "Get image changes", PodmanJsonContext.Default.ImageChangesDto, cancellationToken: cancellationToken);
 
   public Task<Result<ImageImportDto?>> ImportImageAsync(
     Stream? tarball = null,
@@ -140,6 +144,7 @@ public partial class PodmanClient {
     return PostLibpodAsync<ImageImportDto>(
       "/libpod/images/import",
       "Import image",
+      PodmanJsonContext.Default.ImageImportDto,
       content,
       [
         ("changes", changes),
@@ -154,7 +159,7 @@ public partial class PodmanClient {
   public Task<Result<ImageLoadDto?>> LoadImageAsync(Stream tarball, CancellationToken cancellationToken = default) {
     var content = new StreamContent(tarball);
     content.Headers.ContentType = new MediaTypeHeaderValue("application/x-tar");
-    return PostLibpodAsync<ImageLoadDto>("/libpod/images/load", "Load image", content, cancellationToken: cancellationToken);
+    return PostLibpodAsync<ImageLoadDto>("/libpod/images/load", "Load image", PodmanJsonContext.Default.ImageLoadDto, content, cancellationToken: cancellationToken);
   }
 
   public Task<Result<Stream?>> ExportImagesAsync(

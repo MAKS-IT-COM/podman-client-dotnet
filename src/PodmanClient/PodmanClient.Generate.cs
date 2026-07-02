@@ -1,3 +1,4 @@
+using MaksIT.PodmanClientDotNet;
 using System.Net.Http.Headers;
 
 using MaksIT.PodmanClientDotNet.Dtos.Generate;
@@ -18,6 +19,7 @@ public partial class PodmanClient {
     GetJsonAsync<GenerateSystemdDto>(
       $"/libpod/generate/{Uri.EscapeDataString(name)}/systemd",
       "Generate systemd",
+      PodmanJsonContext.Default.GenerateSystemdDto,
       [
         ("useName", useName.ToString().ToLowerInvariant()),
         ("new", createNew.ToString().ToLowerInvariant()),
@@ -62,6 +64,7 @@ public partial class PodmanClient {
     return PostLibpodAsync<PlayKubeReportDto>(
       "/libpod/play/kube",
       "Play kube",
+      PodmanJsonContext.Default.PlayKubeReportDto,
       content,
       [
         ("network", network),

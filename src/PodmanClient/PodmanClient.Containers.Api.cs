@@ -1,3 +1,4 @@
+using MaksIT.PodmanClientDotNet;
 using MaksIT.PodmanClientDotNet.Dtos.Common;
 using MaksIT.PodmanClientDotNet.Dtos.Container;
 using MaksIT.Results;
@@ -16,6 +17,7 @@ public partial class PodmanClient {
     GetJsonAsync<List<ContainerListEntryDto>>(
       "/libpod/containers/json",
       "List containers",
+      PodmanJsonContext.Default.ListContainerListEntryDto,
       [
         ("all", all.ToString().ToLowerInvariant()),
         ("limit", limit?.ToString()),
@@ -27,7 +29,7 @@ public partial class PodmanClient {
     );
 
   public Task<Result<ContainerInspectDto?>> InspectContainerAsync(string name, CancellationToken cancellationToken = default) =>
-    GetJsonAsync<ContainerInspectDto>($"{ContainerPath(name)}/json", "Inspect container", cancellationToken: cancellationToken);
+    GetJsonAsync<ContainerInspectDto>($"{ContainerPath(name)}/json", "Inspect container", PodmanJsonContext.Default.ContainerInspectDto, cancellationToken: cancellationToken);
 
   public Task<Result> ContainerExistsAsync(string name, CancellationToken cancellationToken = default) =>
     GetWithoutBodyAsync($"{ContainerPath(name)}/exists", "Container exists", cancellationToken: cancellationToken);
@@ -58,6 +60,7 @@ public partial class PodmanClient {
     PostLibpodAsync<ContainerWaitDto>(
       $"{ContainerPath(name)}/wait",
       "Wait container",
+      PodmanJsonContext.Default.ContainerWaitDto,
       query: condition is null ? null : [("condition", condition)],
       cancellationToken: cancellationToken
     );
@@ -92,6 +95,7 @@ public partial class PodmanClient {
     GetJsonAsync<ContainerStatsDto>(
       $"{ContainerPath(name)}/stats",
       "Get container stats",
+      PodmanJsonContext.Default.ContainerStatsDto,
       [("stream", stream.ToString().ToLowerInvariant())],
       cancellationToken
     );
@@ -107,13 +111,14 @@ public partial class PodmanClient {
         query.Add(("containers", c));
     }
 
-    return GetJsonAsync<Dictionary<string, ContainerStatsDto>>("/libpod/containers/stats", "Get containers stats", query, cancellationToken);
+    return GetJsonAsync<Dictionary<string, ContainerStatsDto>>("/libpod/containers/stats", "Get containers stats", PodmanJsonContext.Default.DictionaryStringContainerStatsDto, query, cancellationToken);
   }
 
   public Task<Result<PruneReportDto?>> PruneContainersAsync(string? filters = null, CancellationToken cancellationToken = default) =>
     PostLibpodAsync<PruneReportDto>(
       "/libpod/containers/prune",
       "Prune containers",
+      PodmanJsonContext.Default.PruneReportDto,
       query: filters is null ? null : [("filters", filters)],
       cancellationToken: cancellationToken
     );
@@ -178,7 +183,7 @@ public partial class PodmanClient {
     );
 
   public Task<Result<ContainerMountDto?>> MountContainerAsync(string name, CancellationToken cancellationToken = default) =>
-    PostLibpodAsync<ContainerMountDto>($"{ContainerPath(name)}/mount", "Mount container", cancellationToken: cancellationToken);
+    PostLibpodAsync<ContainerMountDto>($"{ContainerPath(name)}/mount", "Mount container", PodmanJsonContext.Default.ContainerMountDto, cancellationToken: cancellationToken);
 
   public Task<Result> UnmountContainerAsync(string name, CancellationToken cancellationToken = default) =>
     PostWithoutBodyAsync($"{ContainerPath(name)}/unmount", "Unmount container", cancellationToken: cancellationToken);
@@ -228,7 +233,7 @@ public partial class PodmanClient {
     );
 
   public Task<Result<ContainerChangesDto?>> GetContainerChangesAsync(string name, CancellationToken cancellationToken = default) =>
-    GetJsonAsync<ContainerChangesDto>($"{ContainerPath(name)}/changes", "Get container changes", cancellationToken: cancellationToken);
+    GetJsonAsync<ContainerChangesDto>($"{ContainerPath(name)}/changes", "Get container changes", PodmanJsonContext.Default.ContainerChangesDto, cancellationToken: cancellationToken);
 
   public Task<Result<ContainerCommitDto?>> CommitContainerAsync(
     string container,
@@ -255,14 +260,14 @@ public partial class PodmanClient {
         query.Add(("changes", change));
     }
 
-    return PostLibpodAsync<ContainerCommitDto>("/libpod/commit", "Commit container", query: query, cancellationToken: cancellationToken);
+    return PostLibpodAsync<ContainerCommitDto>("/libpod/commit", "Commit container", PodmanJsonContext.Default.ContainerCommitDto, query: query, cancellationToken: cancellationToken);
   }
 
   public Task<Result<ContainerHealthCheckDto?>> HealthCheckContainerAsync(string name, CancellationToken cancellationToken = default) =>
-    GetJsonAsync<ContainerHealthCheckDto>($"{ContainerPath(name)}/healthcheck", "Health check container", cancellationToken: cancellationToken);
+    GetJsonAsync<ContainerHealthCheckDto>($"{ContainerPath(name)}/healthcheck", "Health check container", PodmanJsonContext.Default.ContainerHealthCheckDto, cancellationToken: cancellationToken);
 
   public Task<Result<MountedContainersResponseDto?>> GetMountedContainersAsync(CancellationToken cancellationToken = default) =>
-    GetJsonAsync<MountedContainersResponseDto>("/libpod/containers/showmounted", "Get mounted containers", cancellationToken: cancellationToken);
+    GetJsonAsync<MountedContainersResponseDto>("/libpod/containers/showmounted", "Get mounted containers", PodmanJsonContext.Default.MountedContainersResponseDto, cancellationToken: cancellationToken);
 
   public Task<Result<ContainerTopDto?>> TopContainerAsync(
     string name,
@@ -273,6 +278,7 @@ public partial class PodmanClient {
     GetJsonAsync<ContainerTopDto>(
       $"{ContainerPath(name)}/top",
       "Top container",
+      PodmanJsonContext.Default.ContainerTopDto,
       [
         ("ps_args", psArgs),
         ("stream", stream.ToString().ToLowerInvariant()),

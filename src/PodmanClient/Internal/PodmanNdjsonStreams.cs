@@ -1,6 +1,7 @@
+using System.Text.Json;
+
 using Microsoft.Extensions.Logging;
 
-using MaksIT.Core.Extensions;
 using MaksIT.PodmanClientDotNet.Dtos.Build;
 using MaksIT.PodmanClientDotNet.Dtos.Image;
 using MaksIT.Results;
@@ -24,7 +25,7 @@ internal static class PodmanNdjsonStreams {
       if (!line.Contains("\"error\"", StringComparison.Ordinal))
         continue;
 
-      var errorDetails = line.ToObject<PullImageResponseDto>();
+      var errorDetails = JsonSerializer.Deserialize(line, PodmanJsonContext.Default.PullImageResponseDto);
       var message = errorDetails?.Error ?? $"{operation} failed.";
       logger.LogError("{Operation} failed: {Message}", operation, message);
       return Result.BadRequest(message);
@@ -46,7 +47,7 @@ internal static class PodmanNdjsonStreams {
       if (string.IsNullOrWhiteSpace(line))
         continue;
 
-      var progress = line.ToObject<BuildProgressLineDto>();
+      var progress = JsonSerializer.Deserialize(line, PodmanJsonContext.Default.BuildProgressLineDto);
       if (progress is null)
         continue;
 

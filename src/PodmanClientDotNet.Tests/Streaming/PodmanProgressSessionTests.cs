@@ -10,7 +10,7 @@ public class PodmanProgressSessionTests {
   public async Task ReadProgressAsync_ParsesNdjsonLines() {
     var json = "{\"status\":\"Pulling fs layer\"}\n{\"id\":\"abc\"}\n";
     using var stream = new MemoryStream(Encoding.UTF8.GetBytes(json));
-    await using var session = new PodmanProgressSession<PullImageResponseDto>(stream, ownsStream: false);
+    await using var session = new PodmanProgressSession<PullImageResponseDto>(stream, PodmanJsonContext.Default.PullImageResponseDto, ownsStream: false);
 
     var items = new List<PullImageResponseDto>();
     await foreach (var item in session.ReadProgressAsync(TestContext.Current.CancellationToken))
