@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-07-02
+
+### Added
+
+- **Native AOT and trimming compatibility** via `System.Text.Json` source generation (`PodmanJsonContext` with `[JsonSerializable]` for all library DTOs and request models).
+- `<IsAotCompatible>true</IsAotCompatible>` on the package project to surface trim/AOT Roslyn analyzers at build time.
+
+### Changed
+
+- Internal JSON serialization/deserialization now uses explicit `JsonTypeInfo<T>` (`JsonSerializer.Serialize` / `Deserialize`) instead of reflection-based `MaksIT.Core.Extensions` `ToJson()` / `ToObject<T>()`.
+- HTTP helpers (`GetJsonAsync`, `PostJsonAsync`, `PostJsonWithoutBodyAsync`, `PostLibpodAsync`, `DeleteJsonAsync`) and `PodmanProgressSession<T>` updated to thread source-generated type metadata through all call sites.
+- `PodmanJsonContext` uses `PropertyNameCaseInsensitive = true` so Podman lowercase JSON keys map to PascalCase DTO properties.
+
+### Removed
+
+- **MaksIT.Core** package reference (JSON helpers were its only use in this library); consumers no longer pull **MaksIT.Core** transitively from **PodmanClient.DotNet**.
+
+### Thanks
+
+- [@bbartels](https://github.com/bbartels) (Benjamin Bartels) for the Native AOT / trim compatibility contribution ([#1](https://github.com/MAKS-IT-COM/podman-client-dotnet/pull/1)).
+
 ## [1.1.1] - 2026-06-28
 
 ### Changed
