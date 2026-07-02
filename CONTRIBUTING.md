@@ -46,7 +46,7 @@ Types: `(feature):`, `(bugfix):`, `(refactor):`, `(perf):`, `(test):`, `(docs):`
 
 - **.NET 10**, nullable reference types, implicit usings.
 - **Root namespace**: `MaksIT.$(MSBuildProjectName)` in `PodmanClientDotNet.csproj`; omit `namespace` when it matches the root (client partials, abstractions).
-- **MaksIT.Results** for API outcomes; **MaksIT.Core.Extensions** for JSON (`ToJson` / `ToObject<T>`).
+- **MaksIT.Results** for API outcomes; **System.Text.Json** source generation via `PodmanJsonContext` for JSON serialization (AOT/trim-safe).
 - File-scoped namespaces and same-line braces; **Models/** use nullable reference types (`string?`, `List<T>?`, …) for optional JSON fields.
 - XML documentation on public types (DTOs, interfaces, entry types). Method-level docs on large interfaces are optional (`CS1591` suppressed).
 - Model layout helpers: `utils/tools/Polish-PodmanClientSources.ps1`, `utils/tools/Enable-ModelsNullable.ps1`.
