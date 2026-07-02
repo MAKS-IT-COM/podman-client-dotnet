@@ -1,8 +1,8 @@
 using System.Net;
+using System.Text.Json;
 
 using Microsoft.Extensions.Logging;
 
-using MaksIT.Core.Extensions;
 using MaksIT.PodmanClientDotNet.Dtos.Common;
 using MaksIT.Results;
 
@@ -13,7 +13,7 @@ internal static class PodmanHttpResults {
     if (string.IsNullOrWhiteSpace(content))
       return "Podman API request failed.";
 
-    var error = content.ToObject<ErrorResponseDto>();
+    var error = JsonSerializer.Deserialize(content, PodmanJsonContext.Default.ErrorResponseDto);
     return string.IsNullOrWhiteSpace(error?.Message) ? content : error.Message;
   }
 
