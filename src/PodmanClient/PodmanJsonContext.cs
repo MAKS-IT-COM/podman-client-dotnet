@@ -25,6 +25,9 @@ namespace MaksIT.PodmanClientDotNet;
 [JsonSerializable(typeof(ErrorResponseDto))]
 [JsonSerializable(typeof(IdResponseDto))]
 [JsonSerializable(typeof(PruneReportDto))]
+[JsonSerializable(typeof(PruneReportEntryDto))]
+[JsonSerializable(typeof(List<PruneReportEntryDto>))]
+[JsonSerializable(typeof(SystemPruneReportDto))]
 [JsonSerializable(typeof(ReportDto))]
 
 // Build
@@ -33,6 +36,7 @@ namespace MaksIT.PodmanClientDotNet;
 
 // Container
 [JsonSerializable(typeof(ContainerChangesDto))]
+[JsonSerializable(typeof(ContainerChangeEntryDto))]
 [JsonSerializable(typeof(ContainerCommitDto))]
 [JsonSerializable(typeof(ContainerHealthCheckDto))]
 [JsonSerializable(typeof(ContainerInspectDto))]
@@ -40,16 +44,20 @@ namespace MaksIT.PodmanClientDotNet;
 [JsonSerializable(typeof(List<ContainerListEntryDto>))]
 [JsonSerializable(typeof(ContainerMountDto))]
 [JsonSerializable(typeof(ContainerStatsDto))]
-[JsonSerializable(typeof(Dictionary<string, ContainerStatsDto>))]
+[JsonSerializable(typeof(ContainersStatsResponseDto))]
+[JsonSerializable(typeof(ContainerLibpodStatsDto))]
 [JsonSerializable(typeof(ContainerTopDto))]
 [JsonSerializable(typeof(ContainerWaitDto))]
 [JsonSerializable(typeof(CreateContainerResponseDto))]
 [JsonSerializable(typeof(DeleteContainerResponseDto))]
 [JsonSerializable(typeof(DeleteContainerResponseDto[]))]
 [JsonSerializable(typeof(MountedContainersResponseDto))]
+[JsonSerializable(typeof(List<Dictionary<string, string>>))]
+[JsonSerializable(typeof(Dictionary<string, string>))]
 
 // Exec
 [JsonSerializable(typeof(CreateExecResponseDto))]
+[JsonSerializable(typeof(InspectExecProcessDto))]
 [JsonSerializable(typeof(InspectExecResponseDto))]
 
 // Generate
@@ -58,8 +66,8 @@ namespace MaksIT.PodmanClientDotNet;
 
 // Image
 [JsonSerializable(typeof(ImageChangesDto))]
+[JsonSerializable(typeof(ImageChangeEntryDto))]
 [JsonSerializable(typeof(ImageDeleteDto))]
-[JsonSerializable(typeof(ImageDeleteDto[]))]
 [JsonSerializable(typeof(ImageHistoryEntryDto))]
 [JsonSerializable(typeof(List<ImageHistoryEntryDto>))]
 [JsonSerializable(typeof(ImageImportDto))]
@@ -76,6 +84,8 @@ namespace MaksIT.PodmanClientDotNet;
 // Manifest
 [JsonSerializable(typeof(ManifestCreateDto))]
 [JsonSerializable(typeof(ManifestInspectDto))]
+[JsonSerializable(typeof(ManifestPlatformDto))]
+[JsonSerializable(typeof(ManifestListSpecDto))]
 
 // Network
 [JsonSerializable(typeof(NetworkInspectDto))]
@@ -87,6 +97,9 @@ namespace MaksIT.PodmanClientDotNet;
 [JsonSerializable(typeof(PodListEntryDto))]
 [JsonSerializable(typeof(List<PodListEntryDto>))]
 [JsonSerializable(typeof(PodTopDto))]
+[JsonSerializable(typeof(PodStatsDto))]
+[JsonSerializable(typeof(List<PodStatsDto>))]
+[JsonSerializable(typeof(PodContainerSummaryDto))]
 [JsonSerializable(typeof(PodStatsResponseDto))]
 
 // System

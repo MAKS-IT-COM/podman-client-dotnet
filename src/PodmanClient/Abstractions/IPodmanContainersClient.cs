@@ -1,7 +1,6 @@
 using MaksIT.PodmanClientDotNet.Dtos.Common;
 using MaksIT.PodmanClientDotNet.Dtos.Container;
 using MaksIT.PodmanClientDotNet.Models;
-using MaksIT.PodmanClientDotNet.Models.Container;
 using MaksIT.PodmanClientDotNet.Streaming;
 using MaksIT.Results;
 
@@ -163,13 +162,13 @@ public interface IPodmanContainersClient {
   );
 
   Task<Result<ContainerStatsDto?>> GetContainerStatsAsync(string name, bool stream = false, CancellationToken cancellationToken = default);
-  Task<Result<Dictionary<string, ContainerStatsDto>?>> GetContainersStatsAsync(
+  Task<Result<ContainersStatsResponseDto?>> GetContainersStatsAsync(
     IEnumerable<string>? containers = null,
     bool stream = false,
     CancellationToken cancellationToken = default
   );
 
-  Task<Result<PruneReportDto?>> PruneContainersAsync(string? filters = null, CancellationToken cancellationToken = default);
+  Task<Result<List<PruneReportEntryDto>?>> PruneContainersAsync(string? filters = null, CancellationToken cancellationToken = default);
   Task<Result> RenameContainerAsync(string name, string newName, CancellationToken cancellationToken = default);
   Task<Result> InitContainerAsync(string name, CancellationToken cancellationToken = default);
   Task<Result<Stream?>> CheckpointContainerAsync(
@@ -239,6 +238,6 @@ public interface IPodmanContainersClient {
   );
 
   Task<Result<ContainerHealthCheckDto?>> HealthCheckContainerAsync(string name, CancellationToken cancellationToken = default);
-  Task<Result<MountedContainersResponseDto?>> GetMountedContainersAsync(CancellationToken cancellationToken = default);
+  Task<Result<List<Dictionary<string, string>>?>> GetMountedContainersAsync(CancellationToken cancellationToken = default);
   Task<Result<ContainerTopDto?>> TopContainerAsync(string name, string psArgs = "-ef", bool stream = true, CancellationToken cancellationToken = default);
 }

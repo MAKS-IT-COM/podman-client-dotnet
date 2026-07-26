@@ -4,6 +4,7 @@
   "skills": [
     "common/csharp",
     "common/maksit-repo-maintenance",
-    "local-ollama"
+    "local-ollama",
+    "gh-cli"
   ]
 }

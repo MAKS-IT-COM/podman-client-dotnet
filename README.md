@@ -1,6 +1,8 @@
 # PodmanClient.DotNet
 
-![Line Coverage](assets/badges/coverage-lines.svg) ![Branch Coverage](assets/badges/coverage-branches.svg) ![Method Coverage](assets/badges/coverage-methods.svg)
+![Line Coverage](https://img.shields.io/badge/Line%20Coverage-6.2%25-red)
+![Branch Coverage](https://img.shields.io/badge/Branch%20Coverage-14.5%25-orange)
+![Method Coverage](https://img.shields.io/badge/Method%20Coverage-4.4%25-red)
 
 ## Description
 
@@ -37,7 +39,7 @@ dotnet add package PodmanClient.DotNet
 {
   "PodmanClient": {
     "ServerUrl": "http://localhost:8080",
-    "ApiVersion": "v1.41",
+    "ApiVersion": "v5.4.0",
     "TimeoutMinutes": 5
   }
 }
@@ -50,7 +52,7 @@ using MaksIT.PodmanClientDotNet.Extensions;
 // Host-owned options type (not shipped in this package)
 public sealed class PodmanClientOptions : IPodmanClientConfiguration {
   public string ServerUrl { get; set; } = string.Empty;
-  public string ApiVersion { get; set; } = "v1.41";
+  public string ApiVersion { get; set; } = "v5.4.0";
   public int TimeoutMinutes { get; set; } = 60;
 }
 
@@ -162,16 +164,28 @@ Register with `AddPodmanClient` or construct `PodmanClient` manually. Methods re
 
 API responses are typed under `Dtos/` (for example `ContainerInspectDto`, `ImageInspectDto`, `InfoDto`). Request/spec payloads remain in `Models/`.
 
-## Tests
+## PowerShell module
 
-Unit tests cover multiplex framing, attach sessions, NDJSON progress, and a local hijack mock server. Integration tests require a reachable Podman API:
+Binary module wrapping the full `IPodmanClient` surface — see [src/PodmanClient.PowerShell/README.md](src/PodmanClient.PowerShell/README.md).
 
-```shell
-$env:PODMAN_TEST_URL = "http://localhost:8080"
-dotnet test src/PodmanClientDotNet.Tests/PodmanClientDotNet.Tests.csproj
+```powershell
+dotnet build src/PodmanClient.PowerShell/PodmanClient.PowerShell.csproj
+Import-Module .\src\PodmanClient.PowerShell\bin\Debug\net10.0\MaksIT.PodmanClientDotNet.PowerShell.psd1 -Force
+Connect-Podman -BaseAddress 'http://192.168.x.x:8080'
 ```
 
-Without `PODMAN_TEST_URL` (or `PODMAN_INTEGRATION_URL`), integration tests are skipped automatically. Filter them in CI with `--filter "Category!=Integration"`.
+## Tests
+
+Unit tests cover multiplex framing, attach sessions, NDJSON progress, and a local hijack mock server (`dotnet test` / `utils/Invoke-TestEngine.bat`).
+
+Live API E2E uses the PowerShell module against a reachable **Podman 5.4.0** API (baseline):
+
+```powershell
+$env:PODMAN_TEST_URL = "http://192.168.x.x:8080"
+.\src\e2e-tests\Test-PodmanE2E.bat
+```
+
+Default client `ApiVersion` is `v5.4.0`. VM setup, firewall, and troubleshooting: [CONTRIBUTING.md](CONTRIBUTING.md).
 
 **Note:** Full-duplex attach/exec sessions use a raw TCP hijack connection and do not flow through `HttpClient` delegating handlers (proxy, client certificates, etc.). Configure network access accordingly.
 

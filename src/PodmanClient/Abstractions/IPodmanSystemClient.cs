@@ -10,6 +10,6 @@ public interface IPodmanSystemClient {
   Task<Result<LibpodVersionDto?>> GetVersionAsync(CancellationToken cancellationToken = default);
   Task<Result<InfoDto?>> GetInfoAsync(CancellationToken cancellationToken = default);
   Task<Result<SystemDfDto?>> GetSystemDiskUsageAsync(CancellationToken cancellationToken = default);
-  Task<Result<PruneReportDto?>> PruneSystemAsync(CancellationToken cancellationToken = default);
+  Task<Result<SystemPruneReportDto?>> PruneSystemAsync(CancellationToken cancellationToken = default);
   Task<Result<Stream?>> GetEventsAsync(CancellationToken cancellationToken = default);
 }

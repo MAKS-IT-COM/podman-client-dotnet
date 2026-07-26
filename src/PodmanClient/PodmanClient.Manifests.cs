@@ -1,3 +1,5 @@
+using System.Text;
+
 using MaksIT.PodmanClientDotNet;
 using MaksIT.PodmanClientDotNet.Dtos.Manifest;
 using MaksIT.Results;
@@ -10,18 +12,21 @@ public partial class PodmanClient {
     string? image = null,
     bool all = false,
     CancellationToken cancellationToken = default
-  ) =>
-    PostLibpodAsync<ManifestCreateDto>(
-      "/libpod/manifests/create",
+  ) {
+    var query = new List<(string Name, string? Value)> {
+      ("all", all.ToString().ToLowerInvariant()),
+    };
+    if (!string.IsNullOrWhiteSpace(image))
+      query.Add(("images", image));
+
+    return PostLibpodAsync<ManifestCreateDto>(
+      ManifestPath(name),
       "Create manifest",
       PodmanJsonContext.Default.ManifestCreateDto,
-      query: [
-        ("name", name),
-        ("image", image),
-        ("all", all.ToString().ToLowerInvariant()),
-      ],
+      query: [.. query],
       cancellationToken: cancellationToken
     );
+  }
 
   public Task<Result> DeleteManifestAsync(string name, string? digest = null, CancellationToken cancellationToken = default) =>
     DeleteWithoutBodyAsync(
@@ -34,8 +39,14 @@ public partial class PodmanClient {
   public Task<Result<ManifestInspectDto?>> InspectManifestAsync(string name, CancellationToken cancellationToken = default) =>
     GetJsonAsync<ManifestInspectDto>($"{ManifestPath(name)}/json", "Inspect manifest", PodmanJsonContext.Default.ManifestInspectDto, cancellationToken: cancellationToken);
 
-  public Task<Result> AddToManifestAsync(string name, ManifestAddRequestDto request, CancellationToken cancellationToken = default) =>
-    PostJsonWithoutBodyAsync($"{ManifestPath(name)}/add", "Add to manifest", request, PodmanJsonContext.Default.ManifestAddRequestDto, cancellationToken: cancellationToken);
+  public Task<Result> AddToManifestAsync(string name, ManifestAddRequestDto request, CancellationToken cancellationToken = default) {
+    var content = new StringContent(
+      System.Text.Json.JsonSerializer.Serialize(request, PodmanJsonContext.Default.ManifestAddRequestDto),
+      Encoding.UTF8,
+      "application/json"
+    );
+    return PutWithoutBodyAsync(ManifestPath(name), "Add to manifest", content, cancellationToken: cancellationToken);
+  }
 
   public Task<Result> PushManifestAsync(
     string name,
@@ -44,10 +55,9 @@ public partial class PodmanClient {
     CancellationToken cancellationToken = default
   ) =>
     PostWithoutBodyAsync(
-      $"/libpod/manifests/{Uri.EscapeDataString(name)}/push",
+      $"{ManifestPath(name)}/registry/{Uri.EscapeDataString(destination)}",
       "Push manifest",
       query: [
-        ("destination", destination),
         ("all", all.ToString().ToLowerInvariant()),
       ],
       cancellationToken: cancellationToken

@@ -1,6 +1,4 @@
 using System.Text;
-
-using MaksIT.PodmanClientDotNet.Dtos.Build;
 using MaksIT.PodmanClientDotNet.Internal;
 
 using Microsoft.Extensions.Logging;

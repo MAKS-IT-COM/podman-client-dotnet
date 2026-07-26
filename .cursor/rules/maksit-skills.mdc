@@ -9,5 +9,6 @@ alwaysApply: true
 1. `E:\Users\maksym\source\repos\private\homelab\ai\skills\common\csharp\SKILL.md`
 2. `E:\Users\maksym\source\repos\private\homelab\ai\skills\common\maksit-repo-maintenance\SKILL.md`
 3. `E:\Users\maksym\source\repos\private\homelab\ai\skills\local-ollama\SKILL.md` — local Ollama offload (`@local-ollama`)
+4. `E:\Users\maksym\source\repos\private\homelab\ai\skills\gh-cli\SKILL.md` — git/gh commits & PRs (`/gh-cli`, `@gh-cli`)
 
 Manifest: `.cursor/maksit-skills.json`.

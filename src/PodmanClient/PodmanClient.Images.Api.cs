@@ -1,6 +1,5 @@
-using MaksIT.PodmanClientDotNet;
 using System.Net.Http.Headers;
-
+using MaksIT.PodmanClientDotNet;
 using MaksIT.PodmanClientDotNet.Dtos.Common;
 using MaksIT.PodmanClientDotNet.Dtos.Image;
 using MaksIT.PodmanClientDotNet.Internal;
@@ -31,16 +30,16 @@ public partial class PodmanClient {
   public Task<Result> ImageExistsAsync(string name, CancellationToken cancellationToken = default) =>
     GetWithoutBodyAsync($"{ImagePath(name)}/exists", "Image exists", cancellationToken: cancellationToken);
 
-  public Task<Result<ImageDeleteDto[]?>> DeleteImageAsync(string name, bool force = false, CancellationToken cancellationToken = default) =>
-    DeleteJsonAsync<ImageDeleteDto[]>(
+  public Task<Result<ImageDeleteDto?>> DeleteImageAsync(string name, bool force = false, CancellationToken cancellationToken = default) =>
+    DeleteJsonAsync<ImageDeleteDto>(
       ImagePath(name),
       "Delete image",
-      PodmanJsonContext.Default.ImageDeleteDtoArray,
+      PodmanJsonContext.Default.ImageDeleteDto,
       [("force", force.ToString().ToLowerInvariant())],
       cancellationToken
     );
 
-  public Task<Result<ImageDeleteDto[]?>> RemoveImagesAsync(
+  public Task<Result<ImageDeleteDto?>> RemoveImagesAsync(
     IEnumerable<string> images,
     bool all = false,
     bool force = false,
@@ -53,11 +52,11 @@ public partial class PodmanClient {
     foreach (var image in images)
       query.Add(("images", image));
 
-    return DeleteJsonAsync<ImageDeleteDto[]>("/libpod/images/remove", "Remove images", PodmanJsonContext.Default.ImageDeleteDtoArray, query, cancellationToken);
+    return DeleteJsonAsync<ImageDeleteDto>("/libpod/images/remove", "Remove images", PodmanJsonContext.Default.ImageDeleteDto, query, cancellationToken);
   }
 
-  public Task<Result<PruneReportDto?>> PruneImagesAsync(CancellationToken cancellationToken = default) =>
-    PostLibpodAsync<PruneReportDto>("/libpod/images/prune", "Prune images", PodmanJsonContext.Default.PruneReportDto, cancellationToken: cancellationToken);
+  public Task<Result<List<PruneReportEntryDto>?>> PruneImagesAsync(CancellationToken cancellationToken = default) =>
+    PostLibpodAsync<List<PruneReportEntryDto>>("/libpod/images/prune", "Prune images", PodmanJsonContext.Default.ListPruneReportEntryDto, cancellationToken: cancellationToken);
 
   public Task<Result<List<ImageSearchResultDto>?>> SearchImagesAsync(
     string term,

@@ -14,6 +14,28 @@
     Usage: pwsh -Command "Import-Module .\TestRunner.psm1"
 #>
 
+function Import-ExternalCommandSupportInternal {
+    if (Get-Command Invoke-ExternalCommand -ErrorAction SilentlyContinue) {
+        return
+    }
+
+    $srcDir = Split-Path $PSScriptRoot -Parent
+    $candidates = @(
+        (Join-Path $PSScriptRoot 'ExternalCommandSupport.psm1'),
+        (Join-Path $srcDir 'plugins' 'Shared' 'ExternalCommandSupport.psm1')
+    )
+    foreach ($modulePath in $candidates) {
+        if (Test-Path -LiteralPath $modulePath -PathType Leaf) {
+            Import-Module $modulePath -Force -Global
+            break
+        }
+    }
+
+    if (-not (Get-Command Invoke-ExternalCommand -ErrorAction SilentlyContinue)) {
+        throw "ExternalCommandSupport module not found. Expected: $($candidates -join ', ')"
+    }
+}
+
 function Import-LoggingModuleInternal {
     if (Get-Command Write-Log -ErrorAction SilentlyContinue) {
         return
@@ -96,8 +118,8 @@ function Invoke-TestsWithCoverage {
 
     $ErrorActionPreference = "Stop"
 
-    # Normalize to a non-empty list of absolute .csproj paths.
-    $resolvedProjectFiles = [System.Collections.Generic.List[string]]::new()
+    # Normalize to a non-empty list of absolute working directories (folder containing the test project).
+    $resolvedProjectDirs = [System.Collections.Generic.List[string]]::new()
     foreach ($raw in $TestProjectPath) {
         if ([string]::IsNullOrWhiteSpace($raw)) { continue }
         $full = [System.IO.Path]::GetFullPath($raw.Trim())
@@ -107,46 +129,22 @@ function Invoke-TestsWithCoverage {
                 Error = "Test project not found at: $raw"
             }
         }
-
         $item = Get-Item -LiteralPath $full
-        if ($item.PSIsContainer) {
-            $csprojFiles = @(Get-ChildItem -Path $item.FullName -Filter '*.csproj' -File | Sort-Object Name)
-            if ($csprojFiles.Count -eq 0) {
-                return [PSCustomObject]@{
-                    Success = $false
-                    Error = "No .csproj file found in test project directory: $($item.FullName)"
-                }
-            }
-            foreach ($csproj in $csprojFiles) {
-                if ($resolvedProjectFiles -notcontains $csproj.FullName) {
-                    [void]$resolvedProjectFiles.Add($csproj.FullName)
-                }
-            }
-            continue
-        }
-
-        if ([System.IO.Path]::GetExtension($item.FullName) -ne '.csproj') {
-            return [PSCustomObject]@{
-                Success = $false
-                Error = "Test project path is not a .csproj file or directory: $full"
-            }
-        }
-
-        if ($resolvedProjectFiles -notcontains $item.FullName) {
-            [void]$resolvedProjectFiles.Add($item.FullName)
+        $dir = if ($item.PSIsContainer) { $item.FullName } else { $item.Directory.FullName }
+        if ($resolvedProjectDirs -notcontains $dir) {
+            [void]$resolvedProjectDirs.Add($dir)
         }
     }
 
-    if ($resolvedProjectFiles.Count -eq 0) {
+    if ($resolvedProjectDirs.Count -eq 0) {
         return [PSCustomObject]@{
             Success = $false
             Error = "No valid test project paths were provided."
         }
     }
 
-    $firstProjectDir = [System.IO.Path]::GetDirectoryName($resolvedProjectFiles[0])
     if ([string]::IsNullOrWhiteSpace($ResultsDirectory)) {
-        $ResultsDir = Join-Path $firstProjectDir "TestResults"
+        $ResultsDir = Join-Path $resolvedProjectDirs[0] "TestResults"
     }
     else {
         $ResultsDir = [System.IO.Path]::GetFullPath($ResultsDirectory)
@@ -160,53 +158,39 @@ function Invoke-TestsWithCoverage {
 
     if (-not $Silent) {
         Write-TestRunnerLogInternal -Level "STEP" -Message "Running tests with code coverage..."
-        foreach ($projectFile in $resolvedProjectFiles) {
-            Write-TestRunnerLogInternal -Level "INFO" -Message "Test Project: $projectFile"
+        foreach ($d in $resolvedProjectDirs) {
+            Write-TestRunnerLogInternal -Level "INFO" -Message "Test Project: $d"
         }
     }
 
-    $verbosity = if ($Silent) { 'quiet' } else { 'normal' }
+    foreach ($TestProjectDir in $resolvedProjectDirs) {
+        Push-Location $TestProjectDir
+        try {
+            $dotnetArgs = @(
+                "test"
+                "--collect:XPlat Code Coverage"
+                "--results-directory", $ResultsDir
+                "--verbosity", $(if ($Silent) { "quiet" } else { "normal" })
+            )
 
-    foreach ($projectFile in $resolvedProjectFiles) {
-        $buildArgs = @('build', $projectFile, '-v', $verbosity)
-        if ($Silent) {
-            $null = & dotnet @buildArgs 2>&1
-        }
-        else {
-            & dotnet @buildArgs
-        }
+            Import-ExternalCommandSupportInternal
+            if ($Silent) {
+                $null = Invoke-ExternalCommand -Name dotnet -ArgumentList $dotnetArgs -MergeErrorOutput
+            }
+            else {
+                Invoke-ExternalCommand -Name dotnet -ArgumentList $dotnetArgs | Out-Default
+            }
 
-        if ($LASTEXITCODE -ne 0) {
-            return [PSCustomObject]@{
-                Success = $false
-                Error = "Build failed for '$projectFile' with exit code $LASTEXITCODE"
+            $testExitCode = $LASTEXITCODE
+            if ($testExitCode -ne 0) {
+                return [PSCustomObject]@{
+                    Success = $false
+                    Error = "Tests failed in '$TestProjectDir' with exit code $testExitCode"
+                }
             }
         }
-    }
-
-    foreach ($projectFile in $resolvedProjectFiles) {
-        $dotnetArgs = @(
-            'test'
-            $projectFile
-            '--no-build'
-            '--collect:XPlat Code Coverage'
-            '--results-directory', $ResultsDir
-            '--verbosity', $verbosity
-        )
-
-        if ($Silent) {
-            $null = & dotnet @dotnetArgs 2>&1
-        }
-        else {
-            & dotnet @dotnetArgs
-        }
-
-        $testExitCode = $LASTEXITCODE
-        if ($testExitCode -ne 0) {
-            return [PSCustomObject]@{
-                Success = $false
-                Error = "Tests failed in '$projectFile' with exit code $testExitCode"
-            }
+        finally {
+            Pop-Location
         }
     }
 
@@ -370,11 +354,12 @@ function Invoke-NpmJestTestsWithCoverage {
     Push-Location $workspaceFull
     try {
         $npmArgs = @('run', $TestScript, '--', '--coverage', '--coverageReporters=json-summary', '--coverageReporters=text')
+        Import-ExternalCommandSupportInternal
         if ($Silent) {
-            $null = & npm @npmArgs 2>&1
+            $null = Invoke-ExternalCommand -Name npm -ArgumentList $npmArgs -MergeErrorOutput
         }
         else {
-            & npm @npmArgs
+            Invoke-ExternalCommand -Name npm -ArgumentList $npmArgs | Out-Default
         }
 
         if ($LASTEXITCODE -ne 0) {
@@ -428,4 +413,272 @@ function Invoke-NpmJestTestsWithCoverage {
     }
 }
 
-Export-ModuleMember -Function Invoke-TestsWithCoverage, Invoke-NpmJestTestsWithCoverage
+function Get-NpmCoverageFromSummaryFile {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$SummaryPath,
+
+        [switch]$Silent
+    )
+
+    if (-not (Test-Path -LiteralPath $SummaryPath -PathType Leaf)) {
+        return [PSCustomObject]@{
+            Success = $false
+            Error   = "Jest coverage summary not found at: $SummaryPath"
+        }
+    }
+
+    $summaryJson = Get-Content -LiteralPath $SummaryPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    $total = $summaryJson.total
+    if ($null -eq $total) {
+        return [PSCustomObject]@{
+            Success = $false
+            Error   = "Jest coverage summary is missing 'total' metrics in: $SummaryPath"
+        }
+    }
+
+    return [PSCustomObject]@{
+        Success        = $true
+        LineRate       = [math]::Round([double]$total.lines.pct, 1)
+        BranchRate     = [math]::Round([double]$total.branches.pct, 1)
+        MethodRate     = [math]::Round([double]$total.functions.pct, 1)
+        TotalMethods   = [int]$total.functions.total
+        CoveredMethods = [int]$total.functions.covered
+        CoverageFormat = 'npm'
+        CoverageSummaryFile = $SummaryPath
+    }
+}
+
+function Get-DotNetCoverageFromResultsDirectory {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ResultsDirectory,
+
+        [switch]$Silent
+    )
+
+    $coverageFiles = @(Get-ChildItem -Path $ResultsDirectory -Filter 'coverage.cobertura.xml' -Recurse -ErrorAction SilentlyContinue | Sort-Object FullName)
+    if ($coverageFiles.Count -eq 0) {
+        return [PSCustomObject]@{
+            Success = $false
+            Error   = "Coverage file not found under: $ResultsDirectory"
+        }
+    }
+
+    $linesCoveredTotal = 0L
+    $linesValidTotal = 0L
+    $branchesCoveredTotal = 0L
+    $branchesValidTotal = 0L
+    $totalMethods = 0
+    $coveredMethods = 0
+
+    foreach ($cf in $coverageFiles) {
+        [xml]$coverageXml = Get-Content -LiteralPath $cf.FullName -Raw
+        $root = $coverageXml.coverage
+        $lcAttr = $root.'lines-covered'
+        $lvAttr = $root.'lines-valid'
+        if ($null -ne $lcAttr -and $null -ne $lvAttr -and [long]$lvAttr -gt 0) {
+            $linesCoveredTotal += [long]$lcAttr
+            $linesValidTotal += [long]$lvAttr
+        }
+
+        $bcAttr = $root.'branches-covered'
+        $bvAttr = $root.'branches-valid'
+        if ($null -ne $bcAttr -and $null -ne $bvAttr -and [long]$bvAttr -gt 0) {
+            $branchesCoveredTotal += [long]$bcAttr
+            $branchesValidTotal += [long]$bvAttr
+        }
+
+        foreach ($package in @($root.packages.package)) {
+            foreach ($class in @($package.classes.class)) {
+                $methodNodes = $class.methods
+                if ($null -eq $methodNodes) { continue }
+                foreach ($method in @($methodNodes.method)) {
+                    if ($null -eq $method) { continue }
+                    $totalMethods++
+                    if ([double]$method.'line-rate' -gt 0) {
+                        $coveredMethods++
+                    }
+                }
+            }
+        }
+    }
+
+    if ($linesValidTotal -gt 0) {
+        $lineRate = [math]::Round(($linesCoveredTotal / $linesValidTotal) * 100, 1)
+    }
+    else {
+        $acc = 0.0
+        $n = 0
+        foreach ($cf in $coverageFiles) {
+            [xml]$coverageXml = Get-Content -LiteralPath $cf.FullName -Raw
+            $acc += [double]$coverageXml.coverage.'line-rate'
+            $n++
+        }
+        $lineRate = [math]::Round(($acc / [math]::Max($n, 1)) * 100, 1)
+    }
+
+    if ($branchesValidTotal -gt 0) {
+        $branchRate = [math]::Round(($branchesCoveredTotal / $branchesValidTotal) * 100, 1)
+    }
+    else {
+        $acc = 0.0
+        $n = 0
+        foreach ($cf in $coverageFiles) {
+            [xml]$coverageXml = Get-Content -LiteralPath $cf.FullName -Raw
+            $acc += [double]$coverageXml.coverage.'branch-rate'
+            $n++
+        }
+        $branchRate = [math]::Round(($acc / [math]::Max($n, 1)) * 100, 1)
+    }
+
+    $methodRate = if ($totalMethods -gt 0) { [math]::Round(($coveredMethods / $totalMethods) * 100, 1) } else { 0 }
+    $coveragePaths = @($coverageFiles | ForEach-Object { $_.FullName })
+
+    return [PSCustomObject]@{
+        Success           = $true
+        LineRate          = $lineRate
+        BranchRate        = $branchRate
+        MethodRate        = $methodRate
+        TotalMethods      = $totalMethods
+        CoveredMethods    = $coveredMethods
+        CoverageFile      = ($coveragePaths -join ';')
+        CoverageFiles     = $coveragePaths
+        ResultsDirectory  = [System.IO.Path]::GetFullPath($ResultsDirectory)
+        CoverageFormat    = 'dotnet'
+    }
+}
+
+function Get-CoverageFromResultsDirectory {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ResultsDirectory,
+
+        [ValidateSet('auto', 'dotnet', 'npm')]
+        [string]$Format = 'auto',
+
+        [switch]$Silent
+    )
+
+    $resolvedDirectory = [System.IO.Path]::GetFullPath($ResultsDirectory)
+    if (-not (Test-Path -LiteralPath $resolvedDirectory -PathType Container)) {
+        return [PSCustomObject]@{
+            Success = $false
+            Error   = "Results directory not found: $resolvedDirectory"
+        }
+    }
+
+    $hasDotNet = @(Get-ChildItem -Path $resolvedDirectory -Filter 'coverage.cobertura.xml' -Recurse -ErrorAction SilentlyContinue).Count -gt 0
+    $jestSummary = Join-Path $resolvedDirectory 'coverage-summary.json'
+    $hasNpm = Test-Path -LiteralPath $jestSummary -PathType Leaf
+
+    $effectiveFormat = $Format
+    if ($effectiveFormat -eq 'auto') {
+        if ($hasDotNet -and -not $hasNpm) {
+            $effectiveFormat = 'dotnet'
+        }
+        elseif ($hasNpm -and -not $hasDotNet) {
+            $effectiveFormat = 'npm'
+        }
+        elseif ($hasDotNet) {
+            $effectiveFormat = 'dotnet'
+        }
+        elseif ($hasNpm) {
+            $effectiveFormat = 'npm'
+        }
+        else {
+            return [PSCustomObject]@{
+                Success = $false
+                Error   = "Coverage file not found under: $resolvedDirectory"
+            }
+        }
+    }
+
+    if ($effectiveFormat -eq 'dotnet') {
+        return Get-DotNetCoverageFromResultsDirectory -ResultsDirectory $resolvedDirectory -Silent:$Silent
+    }
+
+    if ($effectiveFormat -eq 'npm') {
+        $npmResult = Get-NpmCoverageFromSummaryFile -SummaryPath $jestSummary -Silent:$Silent
+        if (-not $npmResult.Success) {
+            return $npmResult
+        }
+
+        $npmResult | Add-Member -NotePropertyName ResultsDirectory -NotePropertyValue $resolvedDirectory -Force
+        return $npmResult
+    }
+
+    return [PSCustomObject]@{
+        Success = $false
+        Error   = "Unsupported coverage format '$Format'."
+    }
+}
+
+function Publish-CoverageMetricsToSharedContext {
+    param(
+        [Parameter(Mandatory = $true)]
+        $SharedSettings,
+
+        [Parameter(Mandatory = $true)]
+        $TestResult
+    )
+
+    if (-not (Get-Command Set-EngineFact -ErrorAction SilentlyContinue)) {
+        $engineContextPath = Join-Path $PSScriptRoot 'Engine' 'EngineContext.psm1'
+        if (Test-Path -LiteralPath $engineContextPath -PathType Leaf) {
+            Import-Module $engineContextPath -Force -Global
+        }
+    }
+
+    if (Get-Command Set-EngineFact -ErrorAction SilentlyContinue) {
+        Set-EngineFact -Context $SharedSettings -Namespace 'test' -Name 'testResult' -Value $TestResult -Overwrite Replace -LegacyProperty 'testResult'
+        Set-EngineFact -Context $SharedSettings -Namespace 'test' -Name 'coverageLineRate' -Value $TestResult.LineRate -Overwrite Replace -LegacyProperty 'coverageLineRate'
+        Set-EngineFact -Context $SharedSettings -Namespace 'test' -Name 'qualityLineCoverage' -Value $TestResult.LineRate -Overwrite Replace -LegacyProperty 'qualityLineCoverage'
+        Set-EngineFact -Context $SharedSettings -Namespace 'test' -Name 'coverageBranchRate' -Value $TestResult.BranchRate -Overwrite Replace -LegacyProperty 'coverageBranchRate'
+        Set-EngineFact -Context $SharedSettings -Namespace 'test' -Name 'coverageMethodRate' -Value $TestResult.MethodRate -Overwrite Replace -LegacyProperty 'coverageMethodRate'
+        Set-EngineFact -Context $SharedSettings -Namespace 'test' -Name 'coverageTotalMethods' -Value $TestResult.TotalMethods -Overwrite Replace -LegacyProperty 'coverageTotalMethods'
+        Set-EngineFact -Context $SharedSettings -Namespace 'test' -Name 'coverageCoveredMethods' -Value $TestResult.CoveredMethods -Overwrite Replace -LegacyProperty 'coverageCoveredMethods'
+
+        if ($TestResult.PSObject.Properties.Name -contains 'CoverageFormat') {
+            Set-EngineFact -Context $SharedSettings -Namespace 'test' -Name 'coverageFormat' -Value $TestResult.CoverageFormat -Overwrite Replace -LegacyProperty 'coverageFormat'
+        }
+
+        if (($TestResult.PSObject.Properties.Name -contains 'ResultsDirectory') -and $TestResult.ResultsDirectory) {
+            Set-EngineFact -Context $SharedSettings -Namespace 'test' -Name 'testResultsDirectory' -Value $TestResult.ResultsDirectory -Overwrite Replace -LegacyProperty 'testResultsDirectory'
+        }
+
+        if ($TestResult.CoverageFiles) {
+            Set-EngineFact -Context $SharedSettings -Namespace 'test' -Name 'coverageCoberturaPaths' -Value @($TestResult.CoverageFiles) -Overwrite Replace -LegacyProperty 'coverageCoberturaPaths'
+        }
+
+        return
+    }
+
+    $SharedSettings | Add-Member -NotePropertyName testResult -NotePropertyValue $TestResult -Force
+    $SharedSettings | Add-Member -NotePropertyName qualityLineCoverage -NotePropertyValue $TestResult.LineRate -Force
+    $SharedSettings | Add-Member -NotePropertyName coverageLineRate -NotePropertyValue $TestResult.LineRate -Force
+    $SharedSettings | Add-Member -NotePropertyName coverageBranchRate -NotePropertyValue $TestResult.BranchRate -Force
+    $SharedSettings | Add-Member -NotePropertyName coverageMethodRate -NotePropertyValue $TestResult.MethodRate -Force
+    $SharedSettings | Add-Member -NotePropertyName coverageTotalMethods -NotePropertyValue $TestResult.TotalMethods -Force
+    $SharedSettings | Add-Member -NotePropertyName coverageCoveredMethods -NotePropertyValue $TestResult.CoveredMethods -Force
+
+    if ($TestResult.PSObject.Properties.Name -contains 'CoverageFormat') {
+        $SharedSettings | Add-Member -NotePropertyName coverageFormat -NotePropertyValue $TestResult.CoverageFormat -Force
+    }
+
+    if (($TestResult.PSObject.Properties.Name -contains 'ResultsDirectory') -and $TestResult.ResultsDirectory) {
+        $SharedSettings | Add-Member -NotePropertyName testResultsDirectory -NotePropertyValue $TestResult.ResultsDirectory -Force
+    }
+
+    if ($TestResult.CoverageFiles) {
+        $SharedSettings | Add-Member -NotePropertyName coverageCoberturaPaths -NotePropertyValue @($TestResult.CoverageFiles) -Force
+    }
+}
+
+Export-ModuleMember -Function `
+    Invoke-TestsWithCoverage, `
+    Invoke-NpmJestTestsWithCoverage, `
+    Get-NpmCoverageFromSummaryFile, `
+    Get-DotNetCoverageFromResultsDirectory, `
+    Get-CoverageFromResultsDirectory, `
+    Publish-CoverageMetricsToSharedContext

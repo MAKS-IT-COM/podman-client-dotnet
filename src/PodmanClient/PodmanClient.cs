@@ -1,6 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
-
 using MaksIT.PodmanClientDotNet.Extensions;
+using Microsoft.Extensions.Logging;
 
 /// <summary>
 /// HTTP client for the Podman REST API.
@@ -33,7 +32,7 @@ public partial class PodmanClient : IPodmanClient {
   ) {
     _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
-    _apiVersion = "v1.41";
+    _apiVersion = "v5.4.0";
     ConfigureHttpClient(serverUrl);
   }
 
@@ -56,7 +55,7 @@ public partial class PodmanClient : IPodmanClient {
     _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
     _apiVersion = string.IsNullOrWhiteSpace(configuration.ApiVersion)
-      ? "v1.41"
+      ? "v5.4.0"
       : configuration.ApiVersion;
     _httpClient.Timeout = TimeSpan.FromMinutes(Math.Max(1, configuration.TimeoutMinutes));
     ConfigureHttpClient(configuration.ServerUrl);

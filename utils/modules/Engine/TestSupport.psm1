@@ -19,7 +19,10 @@ function New-EngineContext {
         [string]$SrcDir,
 
         [Parameter(Mandatory = $false)]
-        [psobject]$Settings
+        [psobject]$Settings,
+
+        [ValidateSet('single', 'ha')]
+        [string]$DeployMode = 'ha'
     )
 
     $badgesDir = $null
@@ -32,6 +35,7 @@ function New-EngineContext {
         srcDir = $SrcDir
         utilsDir = $SrcDir
         badgesDir = $badgesDir
+        deployMode = $DeployMode
     }
 }
 

@@ -11,5 +11,5 @@ public interface IPodmanVolumesClient {
   Task<Result<List<VolumeListEntryDto>?>> ListVolumesAsync(CancellationToken cancellationToken = default);
   Task<Result<VolumeInspectResponseDto?>> InspectVolumeAsync(string name, CancellationToken cancellationToken = default);
   Task<Result> DeleteVolumeAsync(string name, bool force = false, CancellationToken cancellationToken = default);
-  Task<Result<PruneReportDto?>> PruneVolumesAsync(CancellationToken cancellationToken = default);
+  Task<Result<List<PruneReportEntryDto>?>> PruneVolumesAsync(CancellationToken cancellationToken = default);
 }

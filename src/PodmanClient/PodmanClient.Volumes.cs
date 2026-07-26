@@ -32,6 +32,6 @@ public partial class PodmanClient {
       cancellationToken
     );
 
-  public Task<Result<PruneReportDto?>> PruneVolumesAsync(CancellationToken cancellationToken = default) =>
-    PostLibpodAsync<PruneReportDto>("/libpod/volumes/prune", "Prune volumes", PodmanJsonContext.Default.PruneReportDto, cancellationToken: cancellationToken);
+  public Task<Result<List<PruneReportEntryDto>?>> PruneVolumesAsync(CancellationToken cancellationToken = default) =>
+    PostLibpodAsync<List<PruneReportEntryDto>>("/libpod/volumes/prune", "Prune volumes", PodmanJsonContext.Default.ListPruneReportEntryDto, cancellationToken: cancellationToken);
 }
