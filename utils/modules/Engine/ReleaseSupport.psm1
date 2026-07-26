@@ -78,13 +78,18 @@ function New-EngineContext {
         [string]$SrcDir,
 
         [Parameter(Mandatory = $false)]
-        [psobject]$Settings
+        [psobject]$Settings,
+
+        [switch]$DryRun,
+
+        [ValidateSet('single', 'ha')]
+        [string]$DeployMode = 'ha'
     )
 
     $resolvedVersion = Resolve-ReleaseVersion -Plugins $Plugins -ScriptDir $ScriptDir
     $version = $resolvedVersion.version
     $versionSource = $resolvedVersion.source
-    $releaseRelative = '..\..\..\release'
+    $releaseRelative = '..\..\..\releases'
     $artifactsDirectory = [System.IO.Path]::GetFullPath((Join-Path $ScriptDir $releaseRelative))
 
     $currentBranch = Get-CurrentBranch
@@ -119,6 +124,23 @@ function New-EngineContext {
     $tag = "v$version"
     Write-Log -Level "INFO" -Message "  Release tag default from ${versionSource}: $tag (ReleasePublishGuard may replace from git when publish is allowed)."
 
+    $dryRun = $false
+    if ($DryRun) {
+        $dryRun = $true
+    }
+    else {
+        $dryRun = Get-EngineDryRun -Settings $Settings
+    }
+    Write-Log -Level "INFO" -Message "  Dry run (remote mutations only): $dryRun"
+
+    $orchestrator = Get-MaksitOrchestrator
+    if ($orchestrator) {
+        Write-Log -Level "INFO" -Message "  Orchestrator: $orchestrator (plugin profile filtering active)"
+    }
+    else {
+        Write-Log -Level "INFO" -Message "  Orchestrator: not set (dev mode — all plugins eligible; engine probe still selects docker vs podman)"
+    }
+
     return [pscustomobject]@{
         scriptDir = $ScriptDir
         srcDir = $SrcDir
@@ -132,6 +154,9 @@ function New-EngineContext {
         releaseBranches = $releaseBranches
         publishCompleted = $false
         skipPublishPlugins = $false
+        dryRun = $dryRun
+        deployMode = $DeployMode
+        orchestrator = $orchestrator
     }
 }
 

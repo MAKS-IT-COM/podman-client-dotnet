@@ -1,10 +1,7 @@
 using System.Text.Json;
-
-using Microsoft.Extensions.Logging;
-
 using MaksIT.PodmanClientDotNet.Dtos.Build;
-using MaksIT.PodmanClientDotNet.Dtos.Image;
 using MaksIT.Results;
+using Microsoft.Extensions.Logging;
 
 namespace MaksIT.PodmanClientDotNet.Internal;
 

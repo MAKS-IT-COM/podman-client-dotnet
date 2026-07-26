@@ -16,7 +16,7 @@
       "stageLabel": "test",
       "enabled": true,
       "project": "..\\..\\..\\src\\PodmanClientDotNet.Tests",
-      "resultsDir": "..\\..\\..\\testResults"
+      "resultsDir": "..\\..\\..\\test-results"
     },
     {
       "name": "QualityGate",
@@ -35,7 +35,7 @@
       "projectFiles": [
         "..\\..\\..\\src\\PodmanClient\\PodmanClientDotNet.csproj"
       ],
-      "artifactsDir": "..\\..\\..\\release"
+      "artifactsDir": "..\\..\\..\\releases"
     },
     {
       "name": "DotNetCreateArchive",
@@ -61,7 +61,7 @@
       "name": "GitHub",
       "stageLabel": "release",
       "enabled": true,
-      "githubToken": "GITHUB_MAKS_IT_COM",
+      "githubSecret": "GitHub",
       "repository": "https://github.com/MAKS-IT-COM/podman-client-dotnet",
       "releaseNotesFile": "..\\..\\..\\CHANGELOG.md",
       "releaseTitlePattern": "Release {version}"
@@ -70,7 +70,7 @@
       "name": "DotNetNuGet",
       "stageLabel": "release",
       "enabled": true,
-      "nugetApiKey": "NUGET_MAKS_IT",
+      "nugetSecret": "NuGet",
       "source": "https://api.nuget.org/v3/index.json"
     },
     {
@@ -86,3 +86,4 @@
     }
   ]
 }
+

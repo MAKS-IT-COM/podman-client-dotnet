@@ -1,13 +1,8 @@
 using MaksIT.PodmanClientDotNet;
-using System.Text.Json;
-
-using Microsoft.Extensions.Logging;
-
-using MaksIT.PodmanClientDotNet.Internal;
-using MaksIT.PodmanClientDotNet.Models;
 using MaksIT.PodmanClientDotNet.Dtos.Exec;
 using MaksIT.PodmanClientDotNet.Models.Exec;
 using MaksIT.Results;
+using Microsoft.Extensions.Logging;
 
 public partial class PodmanClient {
   public async Task<Result<CreateExecResponseDto?>> CreateExecAsync(

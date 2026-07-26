@@ -1,15 +1,13 @@
-using MaksIT.PodmanClientDotNet;
 using System.Text;
 using System.Text.Json;
-
-using Microsoft.Extensions.Logging;
-
+using MaksIT.PodmanClientDotNet;
 using MaksIT.PodmanClientDotNet.Dtos.Build;
 using MaksIT.PodmanClientDotNet.Dtos.Image;
 using MaksIT.PodmanClientDotNet.Internal;
 using MaksIT.PodmanClientDotNet.Models.Exec;
 using MaksIT.PodmanClientDotNet.Streaming;
 using MaksIT.Results;
+using Microsoft.Extensions.Logging;
 
 public partial class PodmanClient {
   public async Task<Result<IPodmanAttachSession?>> AttachContainerSessionAsync(

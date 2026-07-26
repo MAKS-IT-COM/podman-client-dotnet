@@ -1,8 +1,8 @@
 namespace MaksIT.PodmanClientDotNet.Dtos.Container;
-/// <summary>
-/// Deserialized Podman libpod API payload (Container Mount).
-/// </summary>
 
+/// <summary>
+/// Result of mounting a container's root filesystem (libpod returns a plain path string).
+/// </summary>
 public sealed class ContainerMountDto {
-  public string? Id { get; set; }
+  public string? Path { get; set; }
 }

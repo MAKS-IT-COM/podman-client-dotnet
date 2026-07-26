@@ -1,15 +1,12 @@
-using MaksIT.PodmanClientDotNet;
 using System.Net;
 using System.Text.Json;
-
-using Microsoft.Extensions.Logging;
-
+using MaksIT.PodmanClientDotNet;
+using MaksIT.PodmanClientDotNet.Dtos.Container;
 using MaksIT.PodmanClientDotNet.Internal;
 using MaksIT.PodmanClientDotNet.Models;
-using MaksIT.PodmanClientDotNet.Dtos.Container;
 using MaksIT.PodmanClientDotNet.Models.Container;
-using MaksIT.PodmanClientDotNet.Models.Exec;
 using MaksIT.Results;
+using Microsoft.Extensions.Logging;
 
 public partial class PodmanClient {
   public async Task<Result<CreateContainerResponseDto?>> CreateContainerAsync(

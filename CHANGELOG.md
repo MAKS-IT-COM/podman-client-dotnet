@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [1.3.0] - 2026-07-27
+
+### Added
+
+- **PowerShell module** `MaksIT.PodmanClientDotNet.PowerShell` wrapping the full `IPodmanClient` surface (`Connect-Podman` and domain cmdlets).
+- **PowerShell E2E** harness under `src/e2e-tests/` (requires `PODMAN_TEST_URL`) covering system, images, containers, exec, volumes, networks, pods, build, manifests, and generate. Validated against **Podman 5.4.0**.
+
+### Changed
+
+- **Default `ApiVersion`**: `v5.4.0` (libpod path). Docker-compat `v1.41` is not used — network endpoints reject it.
+- **Manifests (libpod v4+)**: create via `POST /libpod/manifests/{name}`; add via `PUT` modify body; push via `POST .../registry/{destination}` (replaces deprecated v3 `/create`, `/add`, `/push`).
+- **Pod stats**: `GetPodsStatsAsync` returns `List<PodStatsDto>` (libpod array), not a dictionary wrapper.
+
+### Fixed
+
+- **Ping** (`/_ping`): treat Podman's plain-text `OK` body as success instead of JSON-deserializing it (which threw `JsonException`).
+- **Mount container**: treat plain filesystem path body as `ContainerMountDto.Path`.
+- **Wait container**: accept bare exit-code integer responses from libpod.
+- **System DTOs** (`LibpodVersionDto`, `InfoDto`, `SystemDfDto`): align with live libpod JSON shapes (e.g. version `Platform` object, host `distribution` object, numeric memory fields).
+- **Image DTOs**: `RepoTags`/`RepoDigests` as string arrays; image tree `{Tree}`; image changes as path/kind entries; delete/remove returns a single `ImageDeleteDto` object (not an array).
+- **Prune APIs**: image/container/volume/pod prune return a list of `PruneReportEntryDto`; system prune returns `SystemPruneReportDto`.
+- **Container list/inspect/stats/changes/mounted DTOs**: align with live libpod JSON (including multi-container stats wrapper).
+- **Container inspect**: `Config.StopSignal` is a string (e.g. `SIGTERM`), not `Int64`.
+- **Pod DTOs**: inspect/list `Containers` as object summaries.
+
+### Removed
+
+- C# xUnit live Integration tests (`Category=Integration`); replaced by PowerShell E2E scenarios.
+
+## [1.2.1] - 2026-07-10
+
+### Fixed
+
+- **Inspect exec** deserialization: `ProcessConfig` is now typed as an object (`InspectExecProcessDto`) matching the Podman libpod API, instead of `string` (which threw `JsonException` when reading exit codes after exec).
+
 ## [1.2.0] - 2026-07-02
 
 ### Added

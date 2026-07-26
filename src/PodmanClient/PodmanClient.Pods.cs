@@ -64,12 +64,12 @@ public partial class PodmanClient {
   public Task<Result> UnpausePodAsync(string name, CancellationToken cancellationToken = default) =>
     PostWithoutBodyAsync($"/libpod/pods/{Uri.EscapeDataString(name)}/unpause", "Unpause pod", cancellationToken: cancellationToken);
 
-  public Task<Result<PruneReportDto?>> PrunePodsAsync(CancellationToken cancellationToken = default) =>
-    PostLibpodAsync<PruneReportDto>("/libpod/pods/prune", "Prune pods", PodmanJsonContext.Default.PruneReportDto, cancellationToken: cancellationToken);
+  public Task<Result<List<PruneReportEntryDto>?>> PrunePodsAsync(CancellationToken cancellationToken = default) =>
+    PostLibpodAsync<List<PruneReportEntryDto>>("/libpod/pods/prune", "Prune pods", PodmanJsonContext.Default.ListPruneReportEntryDto, cancellationToken: cancellationToken);
 
   public Task<Result<PodTopDto?>> TopPodAsync(string name, CancellationToken cancellationToken = default) =>
     GetJsonAsync<PodTopDto>($"/libpod/pods/{Uri.EscapeDataString(name)}/top", "Top pod", PodmanJsonContext.Default.PodTopDto, cancellationToken: cancellationToken);
 
-  public Task<Result<PodStatsResponseDto?>> GetPodsStatsAsync(CancellationToken cancellationToken = default) =>
-    GetJsonAsync<PodStatsResponseDto>("/libpod/pods/stats", "Get pods stats", PodmanJsonContext.Default.PodStatsResponseDto, cancellationToken: cancellationToken);
+  public Task<Result<List<PodStatsDto>?>> GetPodsStatsAsync(CancellationToken cancellationToken = default) =>
+    GetJsonAsync<List<PodStatsDto>>("/libpod/pods/stats", "Get pods stats", PodmanJsonContext.Default.ListPodStatsDto, cancellationToken: cancellationToken);
 }

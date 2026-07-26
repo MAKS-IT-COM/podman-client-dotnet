@@ -1,9 +1,10 @@
 {
   "$schema": "https://json-schema.org/draft-07/schema",
   "title": "Run Tests Script Settings",
-  "description": "Plugin-driven tests and coverage badges for PodmanClient.DotNet.",
+  "description": "Plugin-driven tests and shields.io coverage badges for PodmanClient.DotNet.",
   "paths": {
-    "badgesDir": "..\\..\\..\\assets\\badges"
+    "readmePath": "..\\..\\..\\README.md",
+    "testResultsDir": "..\\..\\..\\test-results"
   },
   "plugins": [
     {
@@ -12,7 +13,8 @@
       "enabled": true,
       "projects": [
         "..\\..\\..\\src\\PodmanClientDotNet.Tests"
-      ]
+      ],
+      "resultsDir": "..\\..\\..\\test-results"
     },
     {
       "name": "QualityGate",
@@ -25,20 +27,18 @@
       "name": "CoverageBadges",
       "stageLabel": "report",
       "enabled": true,
-      "badgesDir": "..\\..\\..\\assets\\badges",
+      "badgeFormat": "shields",
+      "readmePath": "..\\..\\..\\README.md",
       "badges": [
         {
-          "name": "coverage-lines.svg",
           "label": "Line Coverage",
           "metric": "line"
         },
         {
-          "name": "coverage-branches.svg",
           "label": "Branch Coverage",
           "metric": "branch"
         },
         {
-          "name": "coverage-methods.svg",
           "label": "Method Coverage",
           "metric": "method"
         }

@@ -9,6 +9,7 @@
     Used by New-EngineContext and version plugins:
     - DotNetReleaseVersion plugin -> projectFiles (.csproj <Version>)
     - NpmReleaseVersion plugin -> packageJsonPath (package.json version)
+    - FileReleaseVersion plugin -> versionFilePath (repo-root VERSION file)
 #>
 
 if (-not (Get-Command Write-Log -ErrorAction SilentlyContinue)) {
@@ -190,6 +191,72 @@ function Resolve-NpmReleaseVersion {
     }
 }
 
+function Get-VersionFileSemver {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$VersionFilePath
+    )
+
+    if (-not (Test-Path $VersionFilePath -PathType Leaf)) {
+        Write-Error "FileReleaseVersion: VERSION file not found at: $VersionFilePath"
+        exit 1
+    }
+
+    $version = (Get-Content -Path $VersionFilePath -Raw -Encoding UTF8).Trim()
+    if ([string]::IsNullOrWhiteSpace($version)) {
+        Write-Error "FileReleaseVersion: VERSION file is empty at: $VersionFilePath"
+        exit 1
+    }
+
+    $version = $version -replace '^[vV]', ''
+    if ($version -notmatch '^\d+\.\d+\.\d+') {
+        Write-Error "FileReleaseVersion: version '$version' in '$VersionFilePath' is not a valid semver."
+        exit 1
+    }
+
+    return $version
+}
+
+function Resolve-FileReleaseVersion {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object[]]$Plugins,
+
+        [Parameter(Mandatory = $true)]
+        [string]$ScriptDir
+    )
+
+    $releaseVersionPlugin = @($Plugins | Where-Object { $_.name -eq 'FileReleaseVersion' } | Select-Object -First 1)
+    if ($releaseVersionPlugin.Count -eq 0 -or $null -eq $releaseVersionPlugin[0]) {
+        Write-Error "Configure a FileReleaseVersion plugin in scriptSettings.json with versionFilePath."
+        exit 1
+    }
+
+    $releaseVersionSettings = $releaseVersionPlugin[0]
+    $versionFileSetting = if ($releaseVersionSettings.versionFilePath) {
+        $releaseVersionSettings.versionFilePath
+    }
+    else {
+        '..\\..\\..\\VERSION'
+    }
+
+    $versionFilePaths = @(Resolve-RelativePaths -Value $versionFileSetting -BasePath $ScriptDir)
+    if ($versionFilePaths.Count -eq 0) {
+        Write-Error "Configure release version via FileReleaseVersion.versionFilePath (repo-root VERSION file)."
+        exit 1
+    }
+
+    $versionFilePath = $versionFilePaths[0]
+    Write-Log -Level "INFO" -Message "Reading version from VERSION file (versionFilePath)..."
+    $version = Get-VersionFileSemver -VersionFilePath $versionFilePath
+    Write-Log -Level "OK" -Message "  $([System.IO.Path]::GetFileName($versionFilePath)): $version"
+
+    return [pscustomobject]@{
+        version = $version
+        source = 'FileReleaseVersion'
+    }
+}
+
 function Resolve-ReleaseVersion {
     param(
         [Parameter(Mandatory = $true)]
@@ -201,9 +268,15 @@ function Resolve-ReleaseVersion {
 
     $dotnetPlugin = @($Plugins | Where-Object { $_.name -eq 'DotNetReleaseVersion' -and $_.enabled -ne $false })
     $npmPlugin = @($Plugins | Where-Object { $_.name -eq 'NpmReleaseVersion' -and $_.enabled -ne $false })
+    $filePlugin = @($Plugins | Where-Object { $_.name -eq 'FileReleaseVersion' -and $_.enabled -ne $false })
 
-    if ($dotnetPlugin.Count -gt 0 -and $npmPlugin.Count -gt 0) {
-        Write-Error "Configure only one release version plugin: DotNetReleaseVersion or NpmReleaseVersion, not both."
+    $enabledVersionPlugins = @()
+    if ($dotnetPlugin.Count -gt 0) { $enabledVersionPlugins += 'DotNetReleaseVersion' }
+    if ($npmPlugin.Count -gt 0) { $enabledVersionPlugins += 'NpmReleaseVersion' }
+    if ($filePlugin.Count -gt 0) { $enabledVersionPlugins += 'FileReleaseVersion' }
+
+    if ($enabledVersionPlugins.Count -gt 1) {
+        Write-Error "Configure only one release version plugin: $($enabledVersionPlugins -join ', ')."
         exit 1
     }
 
@@ -215,11 +288,15 @@ function Resolve-ReleaseVersion {
         return Resolve-NpmReleaseVersion -Plugins $Plugins -ScriptDir $ScriptDir
     }
 
-    Write-Error "Configure a DotNetReleaseVersion plugin (projectFiles) or NpmReleaseVersion plugin (packageJsonPath) in scriptSettings.json."
+    if ($filePlugin.Count -gt 0) {
+        return Resolve-FileReleaseVersion -Plugins $Plugins -ScriptDir $ScriptDir
+    }
+
+    Write-Error "Configure a DotNetReleaseVersion (projectFiles), NpmReleaseVersion (packageJsonPath), or FileReleaseVersion (versionFilePath) plugin in scriptSettings.json."
     exit 1
 }
 
-Export-ModuleMember -Function Get-CsprojPropertyValue, Get-CsprojVersions, Resolve-RelativePaths, Resolve-DotNetReleaseVersion, Resolve-NpmReleaseVersion, Resolve-ReleaseVersion
+Export-ModuleMember -Function Get-CsprojPropertyValue, Get-CsprojVersions, Get-VersionFileSemver, Resolve-RelativePaths, Resolve-DotNetReleaseVersion, Resolve-NpmReleaseVersion, Resolve-FileReleaseVersion, Resolve-ReleaseVersion
 
 
 

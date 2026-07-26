@@ -10,8 +10,9 @@
     via TestRunner, then publishes metrics on the shared engine context for any later
     plugin: `qualityLineCoverage`, `testResult`, `coverageLineRate` / `coverageBranchRate` / `coverageMethodRate`,
     method counts, `testResultsDirectory`, `coverageCoberturaPaths`. Quality gates read
-    those keys generically (not tied to this plugin by name). Cobertura files are removed
-    after parsing unless TestRunner gains KeepResults.
+    those keys generically (not tied to this plugin by name). When `resultsDir` (or the
+    multi-project default TestResults folder) is used, Cobertura output is kept on disk
+    via TestRunner `-KeepResults` so repo-root `test-results/` persists after the run.
 #>
 
 if (-not (Get-Command Import-PluginDependency -ErrorAction SilentlyContinue)) {
@@ -37,75 +38,15 @@ function Invoke-Plugin {
     $testResultsDirSetting = $pluginSettings.resultsDir
     $scriptDir = $sharedSettings.scriptDir
 
-    function Resolve-PluginPath {
-        param(
-            [Parameter(Mandatory = $true)]
-            [string]$ConfiguredPath,
-
-            [Parameter(Mandatory = $true)]
-            [string]$PrimaryBasePath,
-
-            [Parameter(Mandatory = $false)]
-            [string[]]$FallbackBasePaths
-        )
-
-        $trimmedPath = $ConfiguredPath.Trim()
-        if ([string]::IsNullOrWhiteSpace($trimmedPath)) {
-            return $null
-        }
-
-        if ([System.IO.Path]::IsPathRooted($trimmedPath)) {
-            return [System.IO.Path]::GetFullPath($trimmedPath)
-        }
-
-        $candidateBases = [System.Collections.Generic.List[string]]::new()
-        [void]$candidateBases.Add($PrimaryBasePath)
-        foreach ($fallbackBase in @($FallbackBasePaths)) {
-            if (-not [string]::IsNullOrWhiteSpace($fallbackBase) -and $candidateBases -notcontains $fallbackBase) {
-                [void]$candidateBases.Add($fallbackBase)
-            }
-        }
-
-        foreach ($candidateBase in $candidateBases) {
-            $candidatePath = [System.IO.Path]::GetFullPath((Join-Path $candidateBase $trimmedPath))
-            if (Test-Path $candidatePath) {
-                return $candidatePath
-            }
-        }
-
-        # Preserve backward-compatible behavior when no fallback path exists.
-        return [System.IO.Path]::GetFullPath((Join-Path $PrimaryBasePath $trimmedPath))
-    }
-
-    $fallbackBasePaths = @()
-    if ($sharedSettings.PSObject.Properties.Name -contains 'srcDir' -and $sharedSettings.srcDir) {
-        $fallbackBasePaths += [string]$sharedSettings.srcDir
-        try {
-            $repoRoot = Split-Path -Parent ([string]$sharedSettings.srcDir)
-            if (-not [string]::IsNullOrWhiteSpace($repoRoot)) {
-                $fallbackBasePaths += $repoRoot
-            }
-        }
-        catch {
-            # Ignore invalid fallback roots and keep primary behavior.
-        }
-    }
-
     $testProjectPaths = [System.Collections.Generic.List[string]]::new()
     if ($pluginSettings.PSObject.Properties.Name -contains 'projects' -and $pluginSettings.projects) {
         foreach ($rel in @($pluginSettings.projects)) {
             if ([string]::IsNullOrWhiteSpace([string]$rel)) { continue }
-            $resolvedPath = Resolve-PluginPath -ConfiguredPath ([string]$rel) -PrimaryBasePath $scriptDir -FallbackBasePaths $fallbackBasePaths
-            if ($resolvedPath) {
-                $testProjectPaths.Add($resolvedPath)
-            }
+            $testProjectPaths.Add([System.IO.Path]::GetFullPath((Join-Path $scriptDir $rel.Trim())))
         }
     }
     if ($testProjectPaths.Count -eq 0 -and $pluginSettings.project) {
-        $resolvedPath = Resolve-PluginPath -ConfiguredPath ([string]$pluginSettings.project) -PrimaryBasePath $scriptDir -FallbackBasePaths $fallbackBasePaths
-        if ($resolvedPath) {
-            $testProjectPaths.Add($resolvedPath)
-        }
+        $testProjectPaths.Add([System.IO.Path]::GetFullPath((Join-Path $scriptDir $pluginSettings.project)))
     }
     if ($testProjectPaths.Count -eq 0) {
         throw "DotNetTest plugin requires 'project' or 'projects' in scriptSettings.json."
@@ -128,6 +69,7 @@ function Invoke-Plugin {
     }
     if ($testResultsDir) {
         $invokeTestParams.ResultsDirectory = $testResultsDir
+        $invokeTestParams.KeepResults = $true
     }
 
     $testResult = Invoke-TestsWithCoverage @invokeTestParams
@@ -136,19 +78,8 @@ function Invoke-Plugin {
         throw "Tests failed. $($testResult.Error)"
     }
 
-    $sharedSettings | Add-Member -NotePropertyName testResult -NotePropertyValue $testResult -Force
-    $sharedSettings | Add-Member -NotePropertyName qualityLineCoverage -NotePropertyValue $testResult.LineRate -Force
-    $sharedSettings | Add-Member -NotePropertyName coverageLineRate -NotePropertyValue $testResult.LineRate -Force
-    $sharedSettings | Add-Member -NotePropertyName coverageBranchRate -NotePropertyValue $testResult.BranchRate -Force
-    $sharedSettings | Add-Member -NotePropertyName coverageMethodRate -NotePropertyValue $testResult.MethodRate -Force
-    $sharedSettings | Add-Member -NotePropertyName coverageTotalMethods -NotePropertyValue $testResult.TotalMethods -Force
-    $sharedSettings | Add-Member -NotePropertyName coverageCoveredMethods -NotePropertyValue $testResult.CoveredMethods -Force
-    if (($testResult.PSObject.Properties.Name -contains 'ResultsDirectory') -and $testResult.ResultsDirectory) {
-        $sharedSettings | Add-Member -NotePropertyName testResultsDirectory -NotePropertyValue $testResult.ResultsDirectory -Force
-    }
-    if ($testResult.CoverageFiles) {
-        $sharedSettings | Add-Member -NotePropertyName coverageCoberturaPaths -NotePropertyValue @($testResult.CoverageFiles) -Force
-    }
+    Import-PluginDependency -ModuleName "TestRunner" -RequiredCommand "Publish-CoverageMetricsToSharedContext"
+    Publish-CoverageMetricsToSharedContext -SharedSettings $sharedSettings -TestResult $testResult
 
     Write-Log -Level "OK" -Message "  All tests passed!"
     Write-Log -Level "INFO" -Message "  Line Coverage:   $($testResult.LineRate)%"

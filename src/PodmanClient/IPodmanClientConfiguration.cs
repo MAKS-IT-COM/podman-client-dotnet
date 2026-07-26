@@ -14,7 +14,8 @@ public interface IPodmanClientConfiguration {
   string ServerUrl { get; set; }
 
   /// <summary>
-  /// Podman API version segment used in request paths. Defaults to <c>v1.41</c>.
+  /// Podman libpod API version segment used in request paths. Defaults to <c>v5.4.0</c>
+  /// (validated E2E target; use at least <c>v4.0.0</c> — Docker-compat <c>v1.41</c> is rejected by network endpoints).
   /// </summary>
   string ApiVersion { get; set; }
 

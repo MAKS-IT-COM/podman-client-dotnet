@@ -29,15 +29,15 @@ public interface IPodmanImagesClient {
 
   Task<Result<ImageInspectDto?>> InspectImageAsync(string name, CancellationToken cancellationToken = default);
   Task<Result> ImageExistsAsync(string name, CancellationToken cancellationToken = default);
-  Task<Result<ImageDeleteDto[]?>> DeleteImageAsync(string name, bool force = false, CancellationToken cancellationToken = default);
-  Task<Result<ImageDeleteDto[]?>> RemoveImagesAsync(
+  Task<Result<ImageDeleteDto?>> DeleteImageAsync(string name, bool force = false, CancellationToken cancellationToken = default);
+  Task<Result<ImageDeleteDto?>> RemoveImagesAsync(
     IEnumerable<string> images,
     bool all = false,
     bool force = false,
     CancellationToken cancellationToken = default
   );
 
-  Task<Result<PruneReportDto?>> PruneImagesAsync(CancellationToken cancellationToken = default);
+  Task<Result<List<PruneReportEntryDto>?>> PruneImagesAsync(CancellationToken cancellationToken = default);
   Task<Result<List<ImageSearchResultDto>?>> SearchImagesAsync(string term, int? limit = null, CancellationToken cancellationToken = default);
   Task<Result> PushImageAsync(
     string name,

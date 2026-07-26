@@ -1,8 +1,8 @@
 namespace MaksIT.PodmanClientDotNet.Dtos.Container;
+
 /// <summary>
 /// Deserialized Podman libpod API payload (Container Inspect).
 /// </summary>
-
 public sealed class ContainerInspectDto {
   public string? Id { get; set; }
   public string? Name { get; set; }
@@ -21,12 +21,12 @@ public sealed class ContainerInspectDto {
   public string? Driver { get; set; }
   public string? OCIConfigPath { get; set; }
   public string? OCIRuntime { get; set; }
-  public long Created { get; set; }
+  public string? Created { get; set; }
 }
+
 /// <summary>
 /// Deserialized Podman libpod API payload (Container State).
 /// </summary>
-
 public sealed class ContainerStateDto {
   public string? Status { get; set; }
   public bool Running { get; set; }
@@ -39,12 +39,11 @@ public sealed class ContainerStateDto {
   public string? Error { get; set; }
   public string? StartedAt { get; set; }
   public string? FinishedAt { get; set; }
-  public string? Health { get; set; }
 }
+
 /// <summary>
 /// Deserialized Podman libpod API payload (Container Config).
 /// </summary>
-
 public sealed class ContainerConfigDto {
   public string? Hostname { get; set; }
   public string? Domainname { get; set; }
@@ -52,7 +51,7 @@ public sealed class ContainerConfigDto {
   public bool AttachStdin { get; set; }
   public bool AttachStdout { get; set; }
   public bool AttachStderr { get; set; }
-  public string? Tty { get; set; }
+  public bool Tty { get; set; }
   public bool OpenStdin { get; set; }
   public bool StdinOnce { get; set; }
   public string[]? Env { get; set; }

@@ -6,9 +6,9 @@
     Publishes npm workspace packages to the npm registry.
 
 .DESCRIPTION
-    Publishes packages in configured order using an API key from an environment
-    variable (for example NPMJS_MAKS_IT). Uses a temporary .npmrc in the
-    workspace root for auth and supports --skip-duplicate semantics via npm.
+    Publishes packages in configured order using npmSecret (logical secret name).
+    Pass the token via an environment variable named like the configured npm secret (e.g. Npm).
+    Uses a temporary .npmrc in the workspace root.
 #>
 
 if (-not (Get-Command Import-PluginDependency -ErrorAction SilentlyContinue)) {
@@ -32,17 +32,9 @@ function Invoke-Plugin {
     $pluginSettings = $Settings
     $shared = $Settings.context
 
+    $dryRun = Test-PluginSkipsRemoteMutation -Plugin $pluginSettings -SharedSettings $shared
+
     Assert-Command npm
-
-    $npmApiKeyEnvVar = $pluginSettings.npmApiKey
-    if ([string]::IsNullOrWhiteSpace($npmApiKeyEnvVar)) {
-        throw "NpmPublish plugin requires 'npmApiKey' in scriptSettings.json (environment variable name)."
-    }
-
-    $npmApiKey = [System.Environment]::GetEnvironmentVariable($npmApiKeyEnvVar)
-    if ([string]::IsNullOrWhiteSpace($npmApiKey)) {
-        throw "npm API key is not set. Set '$npmApiKeyEnvVar' and rerun."
-    }
 
     $workspaceRoot = $null
     if ($pluginSettings.workspaceRoot) {
@@ -84,11 +76,34 @@ function Invoke-Plugin {
         throw "NpmPublish plugin requires non-empty 'publishOrder' (workspace package names)."
     }
 
+    Import-Module (Join-Path $PSScriptRoot 'NpmPackageSupport.psm1') -Force
+    $useWorkspaces = Test-NpmWorkspacesConfigured -WorkspaceRoot $workspaceRoot
+    if (-not $useWorkspaces -and $publishOrder.Count -gt 1) {
+        throw "NpmPublish plugin requires npm workspaces when publishing more than one package."
+    }
+
+    if ($dryRun) {
+        foreach ($packageName in $publishOrder) {
+            Write-Log -Level "INFO" -Message "Dry run: would publish npm package '$packageName' to $registry"
+        }
+        return
+    }
+
+    $npmSecret = Resolve-PluginSecretName -PluginSettings $pluginSettings -PropertyName 'npmSecret'
+    if ([string]::IsNullOrWhiteSpace($npmSecret)) {
+        throw "NpmPublish plugin requires 'npmSecret' in scriptSettings.json (logical secret name, e.g. Npm)."
+    }
+
+    $npmToken = Get-SecretEnvironmentValue -Name $npmSecret
+    if ([string]::IsNullOrWhiteSpace($npmToken)) {
+        throw "npm API key is not set. Set environment variable '$npmSecret'."
+    }
+
     $registryHost = ([uri]$registry).Host
     $tempNpmRcPath = Join-Path $workspaceRoot ".npmrc.release-temp"
     $npmRcContent = @"
 registry=$registry
-//$registryHost/:_authToken=$npmApiKey
+//$registryHost/:_authToken=$npmToken
 "@
 
     Push-Location $workspaceRoot
@@ -97,7 +112,14 @@ registry=$registry
 
         foreach ($packageName in $publishOrder) {
             Write-Log -Level "STEP" -Message "Publishing npm package '$packageName'..."
-            npm publish -w $packageName --access $access --userconfig $tempNpmRcPath
+            if ($useWorkspaces) {
+                npm publish -w $packageName --access $access --userconfig $tempNpmRcPath
+            }
+            else {
+                Assert-NpmRootPackageName -WorkspaceRoot $workspaceRoot -ExpectedPackageName $packageName
+                npm publish --access $access --userconfig $tempNpmRcPath
+            }
+
             if ($LASTEXITCODE -ne 0) {
                 throw "Failed to publish npm package '$packageName'."
             }
@@ -115,4 +137,8 @@ registry=$registry
     }
 }
 
-Export-ModuleMember -Function Invoke-Plugin
+function Get-PluginMetadata {
+    [pscustomobject]@{ mutatesRemote = $true }
+}
+
+Export-ModuleMember -Function Invoke-Plugin, Get-PluginMetadata

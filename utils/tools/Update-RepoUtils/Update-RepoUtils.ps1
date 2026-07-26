@@ -248,6 +248,11 @@ try {
             }
 
             if (-not $dryRun) {
+                $backupDirectory = Split-Path -Parent $backupPath
+                if (-not (Test-Path -Path $backupDirectory -PathType Container)) {
+                    New-Item -ItemType Directory -Path $backupDirectory -Force | Out-Null
+                }
+
                 Copy-Item -Path $file.FullName -Destination $backupPath -Force
             }
         }

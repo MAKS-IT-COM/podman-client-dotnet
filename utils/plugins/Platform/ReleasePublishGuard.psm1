@@ -3,7 +3,7 @@
 
 <#
 .SYNOPSIS
-    Central gate for publish-stage plugins (DotNetDockerPush, DotNetHelmPush, GitHub, DotNetNuGet, NpmPublish).
+    Central gate before remote-mutation plugins (see each plugin's Get-PluginMetadata).
 
 .DESCRIPTION
     Place this plugin immediately before any publish plugins in scriptSettings.json. It sets
@@ -85,6 +85,11 @@ function Invoke-Plugin {
     $shared | Add-Member -NotePropertyName skipPublishPlugins -NotePropertyValue $false -Force
 
     Write-Log -Level "STEP" -Message "Release publish guard..."
+
+    if ($shared.PSObject.Properties.Name -contains 'dryRun' -and [bool]$shared.dryRun) {
+        Write-Log -Level "INFO" -Message "  Dry run: publish guard relaxed; publish plugins will validate only."
+        return
+    }
 
     $allowed = @(Get-PluginBranches -Plugin $pluginSettings)
     if ($allowed.Count -gt 0 -and $allowed -notcontains '*' -and $allowed -notcontains $shared.currentBranch) {
