@@ -19,10 +19,8 @@ function Import-ExternalCommandSupportInternal {
         return
     }
 
-    $srcDir = Split-Path $PSScriptRoot -Parent
     $candidates = @(
-        (Join-Path $PSScriptRoot 'ExternalCommandSupport.psm1'),
-        (Join-Path $srcDir 'plugins' 'Shared' 'ExternalCommandSupport.psm1')
+        (Join-Path $PSScriptRoot 'ExternalCommandSupport.psm1')
     )
     foreach ($modulePath in $candidates) {
         if (Test-Path -LiteralPath $modulePath -PathType Leaf) {
@@ -175,10 +173,10 @@ function Invoke-TestsWithCoverage {
 
             Import-ExternalCommandSupportInternal
             if ($Silent) {
-                $null = Invoke-ExternalCommand -Name dotnet -ArgumentList $dotnetArgs -MergeErrorOutput
+                $null = Invoke-ExternalCommand -Name dotnet -ArgumentList $dotnetArgs -MergeErrorOutput -ThrowOnError:$false
             }
             else {
-                Invoke-ExternalCommand -Name dotnet -ArgumentList $dotnetArgs | Out-Default
+                Invoke-ExternalCommand -Name dotnet -ArgumentList $dotnetArgs -ThrowOnError:$false | Out-Default
             }
 
             $testExitCode = $LASTEXITCODE
@@ -356,10 +354,10 @@ function Invoke-NpmJestTestsWithCoverage {
         $npmArgs = @('run', $TestScript, '--', '--coverage', '--coverageReporters=json-summary', '--coverageReporters=text')
         Import-ExternalCommandSupportInternal
         if ($Silent) {
-            $null = Invoke-ExternalCommand -Name npm -ArgumentList $npmArgs -MergeErrorOutput
+            $null = Invoke-ExternalCommand -Name npm -ArgumentList $npmArgs -MergeErrorOutput -ThrowOnError:$false
         }
         else {
-            Invoke-ExternalCommand -Name npm -ArgumentList $npmArgs | Out-Default
+            Invoke-ExternalCommand -Name npm -ArgumentList $npmArgs -ThrowOnError:$false | Out-Default
         }
 
         if ($LASTEXITCODE -ne 0) {

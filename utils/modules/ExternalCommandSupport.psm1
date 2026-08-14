@@ -1,6 +1,16 @@
 #requires -Version 7.0
 #requires -PSEdition Core
 
+<#
+  Runs native CLIs (dotnet, git, helm, …) and keeps $LASTEXITCODE intact.
+  By default throws on non-zero exit so callers cannot forget to check.
+  Pass -ThrowOnError:$false when you need the exit code / output yourself
+  (e.g. TestRunner Success objects, logging full container build output first).
+
+  Test hooks: Set-ExternalCommandTestHandler / Set-ExternalCommandAvailability
+  let Pester stub CLIs without touching PATH.
+#>
+
 $script:ExternalCommandTestHandler = $null
 $script:ExternalCommandAvailability = @{}
 
@@ -40,7 +50,10 @@ function Invoke-ExternalCommand {
 
         [string]$InputObject,
 
-        [switch]$MergeErrorOutput
+        [switch]$MergeErrorOutput,
+
+        # Default true: fail fast. Soft callers (tests, nested loggers) pass $false.
+        [bool]$ThrowOnError = $true
     )
 
     $previousLocation = $null
@@ -51,6 +64,7 @@ function Invoke-ExternalCommand {
 
     try {
         $effectiveWorkingDirectory = (Get-Location).Path
+        $output = @()
 
         if ($null -ne $script:ExternalCommandTestHandler) {
             $handlerResult = & $script:ExternalCommandTestHandler `
@@ -62,31 +76,46 @@ function Invoke-ExternalCommand {
 
             $global:LASTEXITCODE = [int]$handlerResult.ExitCode
             if ($null -eq $handlerResult.Output) {
-                return @()
+                $output = @()
             }
-
-            if ($handlerResult.Output -is [System.Collections.IEnumerable] -and -not ($handlerResult.Output -is [string])) {
-                return @($handlerResult.Output)
+            elseif ($handlerResult.Output -is [System.Collections.IEnumerable] -and -not ($handlerResult.Output -is [string])) {
+                $output = @($handlerResult.Output)
             }
-
-            return @([string]$handlerResult.Output)
-        }
-
-        if ($script:ExternalCommandAvailability.ContainsKey($Name) -and -not $script:ExternalCommandAvailability[$Name]) {
-            throw "External command '$Name' is marked unavailable."
-        }
-
-        if (-not [string]::IsNullOrWhiteSpace($InputObject)) {
-            $output = $InputObject | & $Name @ArgumentList 2>&1
-        }
-        elseif ($MergeErrorOutput) {
-            $output = & $Name @ArgumentList 2>&1
+            else {
+                $output = @([string]$handlerResult.Output)
+            }
         }
         else {
-            $output = & $Name @ArgumentList
+            if ($script:ExternalCommandAvailability.ContainsKey($Name) -and -not $script:ExternalCommandAvailability[$Name]) {
+                throw "External command '$Name' is marked unavailable."
+            }
+
+            if (-not [string]::IsNullOrWhiteSpace($InputObject)) {
+                $raw = $InputObject | & $Name @ArgumentList 2>&1
+            }
+            elseif ($MergeErrorOutput) {
+                $raw = & $Name @ArgumentList 2>&1
+            }
+            else {
+                $raw = & $Name @ArgumentList
+            }
+
+            $output = @($raw)
         }
 
-        return @($output)
+        $exitCode = [int]$global:LASTEXITCODE
+        if ($ThrowOnError -and $exitCode -ne 0) {
+            $preview = ($output | ForEach-Object {
+                    if ($_ -is [System.Management.Automation.ErrorRecord]) { $_.ToString() } else { [string]$_ }
+                } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -First 8) -join ' '
+            if ([string]::IsNullOrWhiteSpace($preview)) {
+                throw "External command '$Name' failed with exit code $exitCode."
+            }
+
+            throw "External command '$Name' failed with exit code $exitCode. $preview"
+        }
+
+        return $output
     }
     finally {
         if ($null -ne $previousLocation) {

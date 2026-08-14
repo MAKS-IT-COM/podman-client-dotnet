@@ -5,21 +5,14 @@
 .SYNOPSIS
     Plugin-driven release engine entry script.
 
-.PARAMETER DryRun
-    When set, plugins that declare mutatesRemote in Get-PluginMetadata validate only (no registry push, GitHub release, or cluster deploy).
-
-.PARAMETER Mode
-    Optional override for HelmSelfDeploy values resolution (single or ha).
-    When omitted, HelmSelfDeploy.deployMode from scriptSettings.json is used (CI/CD default).
-    Manual installs: Invoke-ReleasePackage-Single.bat / Invoke-ReleasePackage-HA.bat.
+.NOTES
+    Per-plugin dryRun on mutatesRemote plugins validates without remote mutation.
+    There is no engine-wide dryRun switch — set dryRun on each plugin as needed.
 #>
 
-[CmdletBinding()]
-param(
-    [switch]$DryRun,
-    [ValidateSet('single', 'ha')]
-    [string]$Mode
-)
+# Keep a plain param block so unbound launcher arguments remain in $args for
+# optional Initialize-ReleaseExtension (advanced binding would reject them).
+param()
 
 $ErrorActionPreference = 'Stop'
 Set-Location $PSScriptRoot
@@ -29,20 +22,43 @@ $srcDir = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 . (Join-Path $srcDir 'modules/Engine/Import-EngineModules.ps1')
 Import-EngineModules -Engine Release
 
-$settings = Get-ScriptSettings -ScriptDir $PSScriptRoot
-$resolveModeParams = @{ Settings = $settings }
-if ($PSBoundParameters.ContainsKey('Mode')) {
-    $resolveModeParams['ModeOverride'] = $Mode
+$releaseExtension = $null
+if (Get-Command Initialize-ReleaseExtension -ErrorAction SilentlyContinue) {
+    $releaseExtension = Initialize-ReleaseExtension -ScriptDir $PSScriptRoot -ArgumentList $args
 }
-$deployMode = Get-DeployModeFromSettings @resolveModeParams
+
+$settings = if ($null -ne $releaseExtension) {
+    $releaseExtension.Settings
+}
+else {
+    Get-ScriptSettings -ScriptDir $PSScriptRoot
+}
+
 $configuredPlugins = Get-ConfiguredPlugins -Settings $settings
 
+$releaseBanner = if ($null -ne $releaseExtension) {
+    $releaseExtension.StepBanner
+}
+else {
+    'RELEASE ENGINE'
+}
+
 Write-Log -Level 'STEP' -Message '=================================================='
-Write-Log -Level 'STEP' -Message "RELEASE ENGINE (deploy mode: $deployMode)"
+Write-Log -Level 'STEP' -Message $releaseBanner
 Write-Log -Level 'STEP' -Message '=================================================='
 
 $plugins = $configuredPlugins
-$engineContext = New-EngineContext -Plugins $plugins -ScriptDir $PSScriptRoot -SrcDir $srcDir -Settings $settings -DryRun:$DryRun -DeployMode $deployMode
+$newContextParams = @{
+    Plugins = $plugins
+    ScriptDir = $PSScriptRoot
+    SrcDir = $srcDir
+    Settings = $settings
+}
+if ($null -ne $releaseExtension) {
+    $newContextParams['ExtensionData'] = $releaseExtension.ContextData
+}
+
+$engineContext = New-EngineContext @newContextParams
 
 Write-Log -Level 'OK' -Message 'All pre-flight checks passed!'
 $sharedPluginSettings = $engineContext
@@ -59,14 +75,14 @@ else {
 
         if ((Test-IsPublishPlugin -Plugin $plugin -EngineDirectory $PSScriptRoot) -and -not $releaseStageInitialized) {
             if (Test-PluginRunnable -Plugin $plugin -SharedSettings $sharedPluginSettings -EngineDirectory $PSScriptRoot -WriteLogs:$false) {
-                $remainingPlugins = @($plugins[$pluginIndex..($plugins.Count - 1)])
-                Initialize-ReleaseStageContext -RemainingPlugins $remainingPlugins -SharedSettings $sharedPluginSettings -ArtifactsDirectory $engineContext.artifactsDirectory -Version $engineContext.version
+                Initialize-ReleaseStageContext -SharedSettings $sharedPluginSettings -ArtifactsDirectory $engineContext.artifactsDirectory
                 $releaseStageInitialized = $true
             }
         }
 
-        $pluginSucceeded = Invoke-ConfiguredPlugin -Plugin $plugin -SharedSettings $sharedPluginSettings -EngineDirectory $PSScriptRoot -ContinueOnError:$false
-        if (-not $pluginSucceeded) {
+        $pluginSucceeded = Invoke-ConfiguredPlugin -Plugin $plugin -SharedSettings $sharedPluginSettings -EngineDirectory $PSScriptRoot
+        # Exact $true only: polluted arrays (CLI stdout + $false) are truthy under -not.
+        if ($pluginSucceeded -ne $true) {
             $releaseHadPluginFailures = $true
             break
         }
@@ -87,9 +103,6 @@ elseif ($engineContext.PSObject.Properties.Name -contains 'skipPublishPlugins' -
 }
 elseif ($engineContext.isNonReleaseBranch) {
     Write-Log -Level 'OK' -Message 'NON-RELEASE RUN COMPLETE'
-}
-elseif ($engineContext.dryRun) {
-    Write-Log -Level 'OK' -Message 'DRY RUN COMPLETE'
 }
 else {
     Write-Log -Level 'OK' -Message 'RELEASE COMPLETE'

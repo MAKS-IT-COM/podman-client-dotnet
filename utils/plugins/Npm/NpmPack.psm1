@@ -27,7 +27,7 @@ function Invoke-Plugin {
 
     Import-PluginDependency -ModuleName "Logging" -RequiredCommand "Write-Log"
     Import-PluginDependency -ModuleName "ScriptConfig" -RequiredCommand "Assert-Command"
-    Import-PluginDependency -ModuleName "EngineContext" -RequiredCommand "Resolve-RelativePaths"
+    Import-PluginDependency -ModuleName "EngineContext" -RequiredCommand "Set-EngineFact"
 
     $pluginSettings = $Settings
     $shared = $Settings.context
@@ -49,6 +49,7 @@ function Invoke-Plugin {
     $artifactsDirectory = $null
     if ($pluginSettings.PSObject.Properties['artifactsDir'] -and -not [string]::IsNullOrWhiteSpace([string]$pluginSettings.artifactsDir)) {
         $artifactsDirectory = [System.IO.Path]::GetFullPath((Join-Path $shared.scriptDir ([string]$pluginSettings.artifactsDir)))
+        Set-EngineState -Context $shared -Name 'artifactsDirectory' -Value $artifactsDirectory
     }
     elseif ($shared.PSObject.Properties['artifactsDirectory'] -and -not [string]::IsNullOrWhiteSpace([string]$shared.artifactsDirectory)) {
         $artifactsDirectory = [string]$shared.artifactsDirectory
@@ -125,10 +126,11 @@ function Invoke-Plugin {
         Pop-Location
     }
 
-    $shared | Add-Member -NotePropertyName releaseDir -NotePropertyValue $artifactsDirectory -Force
-    $shared | Add-Member -NotePropertyName releaseAssetPaths -NotePropertyValue $releaseAssetPaths -Force
+    Set-EngineState -Context $shared -Name 'releaseDir' -Value $artifactsDirectory
+    Set-EngineFact -Context $shared -Namespace 'release' -Name 'assetPaths' -Value $releaseAssetPaths -Overwrite Replace -LegacyProperty 'releaseAssetPaths'
     if ($releaseAssetPaths.Count -gt 0) {
-        $shared | Add-Member -NotePropertyName packageFile -NotePropertyValue (Get-Item -LiteralPath $releaseAssetPaths[0]) -Force
+        $packageItem = Get-Item -LiteralPath $releaseAssetPaths[0]
+        Set-EngineFact -Context $shared -Namespace 'npm' -Name 'packageFile' -Value $packageItem -Overwrite Replace -LegacyProperty 'packageFile'
     }
 
     Write-Log -Level "OK" -Message "  npm pack completed ($($releaseAssetPaths.Count) tarball(s))."

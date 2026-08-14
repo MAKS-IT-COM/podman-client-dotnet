@@ -22,7 +22,7 @@ function Test-IsEngineRuntimeModuleName {
         [string]$ModuleName
     )
 
-    # Engine runtime under modules/ only — never dual-homed under plugins/.
+    # Host engine runtime under modules/ (and optional modules/Extensions/) — never dual-homed under plugins/.
     $engineNames = [System.Collections.Generic.HashSet[string]]::new(
         [string[]]@(
             'ChangelogSupport',
@@ -34,16 +34,40 @@ function Test-IsEngineRuntimeModuleName {
             'EngineContext',
             'PluginSupport',
             'ReleaseSupport',
-            'TestSupport',
-            'DeployConfig',
-            'EngineContextSupport',
-            'OrchestratorSupport',
-            'PluginPathSupport'
+            'TestSupport'
         ),
         [System.StringComparer]::OrdinalIgnoreCase
     )
 
     return $engineNames.Contains($ModuleName)
+}
+
+function Get-PluginDependencyGroupDirectories {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$PluginsRoot
+    )
+
+    if (-not (Test-Path -LiteralPath $PluginsRoot -PathType Container)) {
+        return @()
+    }
+
+    # Prefer Shared (helpers), then stock host groups; any other plugins/{Group}/ is discovered.
+    $preferred = @('Shared', 'Platform', 'DotNet', 'Npm')
+    $dirs = [System.Collections.Generic.List[string]]::new()
+    foreach ($name in $preferred) {
+        $path = Join-Path $PluginsRoot $name
+        if (Test-Path -LiteralPath $path -PathType Container) {
+            $dirs.Add($path)
+        }
+    }
+
+    Get-ChildItem -LiteralPath $PluginsRoot -Directory -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -notin $preferred } |
+        Sort-Object Name |
+        ForEach-Object { $dirs.Add($_.FullName) }
+
+    return @($dirs)
 }
 
 function Import-PluginDependency {
@@ -66,16 +90,16 @@ function Import-PluginDependency {
     $candidatePaths = [System.Collections.Generic.List[string]]::new()
 
     if (Test-IsEngineRuntimeModuleName -ModuleName $ModuleName) {
-        # Engine runtime: modules/ only (no plugins/ fallback).
+        # Engine runtime: modules/ only (no plugins/ fallback). Optional Extensions/ for layered hosts.
         $candidatePaths.Add((Join-Path $modulesDir "$ModuleName.psm1"))
         $candidatePaths.Add((Join-Path $engineModuleDir "$ModuleName.psm1"))
         $extensionsDir = Join-Path $modulesDir 'Extensions'
         $candidatePaths.Add((Join-Path $extensionsDir "$ModuleName.psm1"))
     }
     else {
-        # Plugin helpers: plugins/ only (no modules/ legacy shadow).
-        foreach ($group in @('Shared', 'Platform', 'DotNet', 'Npm', 'Helm', 'Docker', 'Podman')) {
-            $candidatePaths.Add((Join-Path (Join-Path $pluginsRoot $group) "$ModuleName.psm1"))
+        # Plugin helpers: plugins/{Group}/ only (no modules/ legacy shadow). Groups are discovered.
+        foreach ($groupDir in Get-PluginDependencyGroupDirectories -PluginsRoot $pluginsRoot) {
+            $candidatePaths.Add((Join-Path $groupDir "$ModuleName.psm1"))
         }
     }
 
@@ -344,8 +368,8 @@ function Get-RegistryCredentialsFromRuntime {
 
     .DESCRIPTION
         Looks up the environment variable named by SecretName. The value must be
-        Base64(UTF8('username:password')). Used by Docker/Podman/Helm registry login
-        and image-pull secret creation — never pass the password itself as a parameter.
+        Base64(UTF8('username:password')). Used by registry login and image-pull
+        secret creation — never pass the password itself as a parameter.
 
     .PARAMETER SecretName
         Logical secret name (environment variable name), not a password or token.
@@ -671,10 +695,7 @@ function Invoke-ConfiguredPlugin {
         [psobject]$SharedSettings,
 
         [Parameter(Mandatory = $true)]
-        [string]$EngineDirectory,
-
-        [Parameter(Mandatory = $false)]
-        [bool]$ContinueOnError = $false
+        [string]$EngineDirectory
     )
 
     if (-not (Test-PluginRunnable -Plugin $Plugin -SharedSettings $SharedSettings -EngineDirectory $EngineDirectory -WriteLogs:$true)) {
@@ -716,12 +737,16 @@ function Invoke-ConfiguredPlugin {
     $pluginModulePath = Resolve-PluginModulePath -Plugin $Plugin -EngineDirectory $EngineDirectory
     Write-Log -Level "STEP" -Message "Running plugin '$($Plugin.name)'..."
 
+    # Sink plugin success-stream output to the host so it cannot pollute this
+    # function's return value. Otherwise `return $false` after CLI stdout becomes
+    # @("helm-line…", $false), which is truthy under `if (-not $result)` and
+    # causes RELEASE COMPLETE / exit 0 after a failed plugin.
     try {
         $moduleInfo = Import-Module $pluginModulePath -Force -PassThru -ErrorAction Stop
         $invokeCommand = Get-Command -Name "Invoke-Plugin" -Module $moduleInfo.Name -ErrorAction Stop
         $pluginSettings = New-PluginInvocationSettings -Plugin $Plugin -SharedSettings $SharedSettings
 
-        & $invokeCommand -Settings $pluginSettings
+        & $invokeCommand -Settings $pluginSettings | ForEach-Object { Write-Host $_ }
         Write-Log -Level "OK" -Message "  Plugin '$($Plugin.name)' completed."
         return $true
     }

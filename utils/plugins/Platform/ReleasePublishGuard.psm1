@@ -50,10 +50,15 @@ function Invoke-NotMetInternal {
         [string]$Reason
     )
 
-    $Shared | Add-Member -NotePropertyName skipPublishPlugins -NotePropertyValue $true -Force
+    if (Get-Command Set-EngineState -ErrorAction SilentlyContinue) {
+        Set-EngineState -Context $Shared -Name 'skipPublishPlugins' -Value $true
+    }
+    else {
+        $Shared | Add-Member -NotePropertyName skipPublishPlugins -NotePropertyValue $true -Force
+    }
+
     if ($When -eq 'fail') {
-        Write-Log -Level "ERROR" -Message "ReleasePublishGuard: $Reason"
-        exit 1
+        throw "ReleasePublishGuard: $Reason"
     }
 
     Write-Log -Level "WARN" -Message "  Publish suppressed: $Reason"
@@ -67,6 +72,7 @@ function Invoke-Plugin {
 
     Import-PluginDependency -ModuleName "Logging" -RequiredCommand "Write-Log"
     Import-PluginDependency -ModuleName "PluginSupport" -RequiredCommand "Get-PluginBranches"
+    Import-PluginDependency -ModuleName "EngineContext" -RequiredCommand "Set-EngineState"
 
     Import-PluginDependency -ModuleName "GitTools" -RequiredCommand "Get-GitStatusShort"
     Import-PluginDependency -ModuleName "GitTools" -RequiredCommand "Test-RemoteTagExists"
@@ -82,14 +88,9 @@ function Invoke-Plugin {
         throw "ReleasePublishGuard: whenRequirementsNotMet must be 'skip' or 'fail'."
     }
 
-    $shared | Add-Member -NotePropertyName skipPublishPlugins -NotePropertyValue $false -Force
+    Set-EngineState -Context $shared -Name 'skipPublishPlugins' -Value $false
 
     Write-Log -Level "STEP" -Message "Release publish guard..."
-
-    if ($shared.PSObject.Properties.Name -contains 'dryRun' -and [bool]$shared.dryRun) {
-        Write-Log -Level "INFO" -Message "  Dry run: publish guard relaxed; publish plugins will validate only."
-        return
-    }
 
     $allowed = @(Get-PluginBranches -Plugin $pluginSettings)
     if ($allowed.Count -gt 0 -and $allowed -notcontains '*' -and $allowed -notcontains $shared.currentBranch) {
@@ -143,7 +144,7 @@ function Invoke-Plugin {
             return
         }
 
-        $shared | Add-Member -NotePropertyName tag -NotePropertyValue $tag -Force
+        Set-EngineState -Context $shared -Name 'tag' -Value $tag
     }
 
     $ensureRemote = $true
