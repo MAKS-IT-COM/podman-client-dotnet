@@ -76,7 +76,8 @@ function Invoke-Plugin {
     }
 
     Write-Log -Level "OK" -Message "  NuGet push completed."
-    $sharedSettings | Add-Member -NotePropertyName publishCompleted -NotePropertyValue $true -Force
+    Import-PluginDependency -ModuleName "EngineContext" -RequiredCommand "Add-EnginePublishCompletion"
+    Add-EnginePublishCompletion -Context $sharedSettings -Publisher 'DotNetNuGet'
 }
 
 function Get-PluginMetadata {

@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-08-14
+
+### Changed
+
+- Updated **MaksIT.Results** (2.0.4), **Microsoft.Extensions.*** (10.0.11), and **System.Management.Automation** (7.6.5) package references.
+- Updated test dependencies: **Microsoft.NET.Test.Sdk** (18.9.0), **Microsoft.Extensions.Logging.Console** (10.0.11).
+- Synced **RepoUtils** (`utils/`): engine/plugin updates; removed obsolete `Update-RepoUtils` tooling (local-copy sync only).
+
 ## [1.3.0] - 2026-07-27
 
 ### Added

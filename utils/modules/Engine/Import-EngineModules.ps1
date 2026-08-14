@@ -32,4 +32,9 @@ function Import-EngineModules {
 
         Import-Module $modulePath -Force
     }
+
+    $extensionImport = Join-Path $modulesDir 'Extensions' 'Import-ExtensionModules.ps1'
+    if (Test-Path -LiteralPath $extensionImport -PathType Leaf) {
+        . $extensionImport
+    }
 }

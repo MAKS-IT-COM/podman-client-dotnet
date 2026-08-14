@@ -127,7 +127,8 @@ registry=$registry
         }
 
         Write-Log -Level "OK" -Message "  npm publish completed."
-        $shared | Add-Member -NotePropertyName publishCompleted -NotePropertyValue $true -Force
+        Import-PluginDependency -ModuleName "EngineContext" -RequiredCommand "Add-EnginePublishCompletion"
+        Add-EnginePublishCompletion -Context $shared -Publisher 'NpmPublish'
     }
     finally {
         if (Test-Path $tempNpmRcPath -PathType Leaf) {

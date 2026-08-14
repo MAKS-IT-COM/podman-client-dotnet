@@ -6,7 +6,7 @@
     Pester test plugin for the RepoUtils test engine.
 
 .DESCRIPTION
-    Runs the community Pester suite and publishes normalized coverage metrics on the
+    Runs the RepoUtils Pester suite and publishes normalized coverage metrics on the
     shared engine context for QualityGate.
 #>
 

@@ -26,6 +26,7 @@ function Invoke-Plugin {
     )
 
     Import-PluginDependency -ModuleName "Logging" -RequiredCommand "Write-Log"
+    Import-PluginDependency -ModuleName "EngineContext" -RequiredCommand "Set-EngineFact"
 
     $pluginSettings = $Settings
     $sharedSettings = $Settings.context
@@ -33,13 +34,18 @@ function Invoke-Plugin {
     $version = $sharedSettings.version
     $archiveInputs = @()
 
-    if ($sharedSettings.PSObject.Properties['releaseArchiveInputs'] -and $sharedSettings.releaseArchiveInputs) {
-        $archiveInputs = @($sharedSettings.releaseArchiveInputs)
+    $fromFact = Get-EngineFact -Context $sharedSettings -Namespace 'release' -Name 'archiveInputs' -LegacyProperty @('releaseArchiveInputs')
+    if ($null -ne $fromFact) {
+        $archiveInputs = @($fromFact)
     }
-    elseif ($sharedSettings.PSObject.Properties['packageFile'] -and $sharedSettings.packageFile) {
-        $archiveInputs = @($sharedSettings.packageFile.FullName)
-        if ($sharedSettings.PSObject.Properties['symbolsPackageFile'] -and $sharedSettings.symbolsPackageFile) {
-            $archiveInputs += $sharedSettings.symbolsPackageFile.FullName
+    else {
+        $packageFile = Get-EngineFact -Context $sharedSettings -Namespace 'dotnet' -Name 'packageFile' -LegacyProperty @('packageFile')
+        if ($null -ne $packageFile) {
+            $archiveInputs = @($packageFile.FullName)
+            $symbolsPackageFile = Get-EngineFact -Context $sharedSettings -Namespace 'dotnet' -Name 'symbolsPackageFile' -LegacyProperty @('symbolsPackageFile')
+            if ($null -ne $symbolsPackageFile) {
+                $archiveInputs += $symbolsPackageFile.FullName
+            }
         }
     }
 
@@ -79,16 +85,18 @@ function Invoke-Plugin {
     Write-Log -Level "OK" -Message "  Release archive ready: $zipPath"
 
     $releaseAssetPaths = @($zipPath)
-    if ($sharedSettings.PSObject.Properties['packageFile'] -and $sharedSettings.packageFile) {
-        $releaseAssetPaths += $sharedSettings.packageFile.FullName
+    $packageFile = Get-EngineFact -Context $sharedSettings -Namespace 'dotnet' -Name 'packageFile' -LegacyProperty @('packageFile')
+    if ($null -ne $packageFile) {
+        $releaseAssetPaths += $packageFile.FullName
     }
-    if ($sharedSettings.PSObject.Properties['symbolsPackageFile'] -and $sharedSettings.symbolsPackageFile) {
-        $releaseAssetPaths += $sharedSettings.symbolsPackageFile.FullName
+    $symbolsPackageFile = Get-EngineFact -Context $sharedSettings -Namespace 'dotnet' -Name 'symbolsPackageFile' -LegacyProperty @('symbolsPackageFile')
+    if ($null -ne $symbolsPackageFile) {
+        $releaseAssetPaths += $symbolsPackageFile.FullName
     }
 
-    $sharedSettings | Add-Member -NotePropertyName releaseDir -NotePropertyValue $artifactsDirectory -Force
-    $sharedSettings | Add-Member -NotePropertyName releaseArchivePath -NotePropertyValue $zipPath -Force
-    $sharedSettings | Add-Member -NotePropertyName releaseAssetPaths -NotePropertyValue $releaseAssetPaths -Force
+    Set-EngineState -Context $sharedSettings -Name 'releaseDir' -Value $artifactsDirectory
+    Set-EngineFact -Context $sharedSettings -Namespace 'release' -Name 'archivePath' -Value $zipPath -Overwrite Replace -LegacyProperty 'releaseArchivePath'
+    Set-EngineFact -Context $sharedSettings -Namespace 'release' -Name 'assetPaths' -Value $releaseAssetPaths -Overwrite Replace -LegacyProperty 'releaseAssetPaths'
 }
 
 Export-ModuleMember -Function Invoke-Plugin

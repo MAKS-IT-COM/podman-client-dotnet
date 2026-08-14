@@ -24,11 +24,99 @@ if (-not (Get-Command Get-PluginStageLabel -ErrorAction SilentlyContinue) -or -n
     }
 }
 
-if (-not (Get-Command Resolve-ReleaseVersion -ErrorAction SilentlyContinue)) {
+if (-not (Get-Command Resolve-RelativePaths -ErrorAction SilentlyContinue) -or -not (Get-Command Set-EngineState -ErrorAction SilentlyContinue)) {
     $engineContextModulePath = Join-Path $PSScriptRoot "EngineContext.psm1"
     if (Test-Path $engineContextModulePath -PathType Leaf) {
         Import-Module $engineContextModulePath -Force
     }
+}
+
+function Get-EnabledVersionPlugins {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object[]]$Plugins,
+
+        [Parameter(Mandatory = $true)]
+        [string]$ScriptDir
+    )
+
+    $versionPlugins = @()
+    foreach ($plugin in $Plugins) {
+        if ($null -eq $plugin -or [string]::IsNullOrWhiteSpace([string]$plugin.name)) {
+            continue
+        }
+
+        if (-not $plugin.enabled) {
+            continue
+        }
+
+        $metadata = Get-PluginMetadataObject -Plugin $plugin -EngineDirectory $ScriptDir
+        if ($null -eq $metadata) {
+            continue
+        }
+
+        if (($metadata.PSObject.Properties.Name -contains 'providesVersion') -and [bool]$metadata.providesVersion) {
+            $versionPlugins += $plugin
+        }
+    }
+
+    return @($versionPlugins)
+}
+
+function Invoke-VersionPlugin {
+    param(
+        [Parameter(Mandatory = $true)]
+        $Plugin,
+
+        [Parameter(Mandatory = $true)]
+        [psobject]$Context,
+
+        [Parameter(Mandatory = $true)]
+        [string]$EngineDirectory
+    )
+
+    $modulePath = Resolve-PluginModulePath -Plugin $Plugin -EngineDirectory $EngineDirectory
+    if (-not (Test-Path $modulePath -PathType Leaf)) {
+        throw "Version plugin '$($Plugin.name)' module not found at: $modulePath"
+    }
+
+    $moduleInfo = Import-Module $modulePath -Force -PassThru -ErrorAction Stop
+    $invokeCommand = Get-Command -Name "Invoke-Plugin" -Module $moduleInfo.Name -ErrorAction Stop
+    $pluginSettings = New-PluginInvocationSettings -Plugin $Plugin -SharedSettings $Context
+    & $invokeCommand -Settings $pluginSettings
+}
+
+function Resolve-EngineContextVersion {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object[]]$Plugins,
+
+        [Parameter(Mandatory = $true)]
+        [psobject]$Context,
+
+        [Parameter(Mandatory = $true)]
+        [string]$ScriptDir
+    )
+
+    $versionPlugins = @(Get-EnabledVersionPlugins -Plugins $Plugins -ScriptDir $ScriptDir)
+    if ($versionPlugins.Count -eq 0) {
+        throw "Configure exactly one enabled release version plugin (declares providesVersion in Get-PluginMetadata), e.g. DotNetReleaseVersion (projectFiles), NpmReleaseVersion (packageJsonPath), or FileReleaseVersion (versionFilePath)."
+    }
+
+    if ($versionPlugins.Count -gt 1) {
+        $names = ($versionPlugins | ForEach-Object { [string]$_.name }) -join ', '
+        throw "Configure only one enabled release version plugin. Found: $names."
+    }
+
+    $versionPlugin = $versionPlugins[0]
+    Invoke-VersionPlugin -Plugin $versionPlugin -Context $Context -EngineDirectory $ScriptDir
+
+    $version = Get-EngineState -Context $Context -Name 'version'
+    if ($null -eq $version -or [string]::IsNullOrWhiteSpace([string]$version)) {
+        throw "Version plugin '$($versionPlugin.name)' did not set a version on the engine context."
+    }
+
+    return [string]$versionPlugin.name
 }
 
 function Assert-WorkingTreeClean {
@@ -49,20 +137,19 @@ function Assert-WorkingTreeClean {
 function Initialize-ReleaseStageContext {
     param(
         [Parameter(Mandatory = $true)]
-        [object[]]$RemainingPlugins,
-
-        [Parameter(Mandatory = $true)]
         [psobject]$SharedSettings,
 
         [Parameter(Mandatory = $true)]
-        [string]$ArtifactsDirectory,
-
-        [Parameter(Mandatory = $true)]
-        [string]$Version
+        [string]$ArtifactsDirectory
     )
 
     if (-not $SharedSettings.PSObject.Properties['releaseDir'] -or [string]::IsNullOrWhiteSpace([string]$SharedSettings.releaseDir)) {
-        $SharedSettings | Add-Member -NotePropertyName releaseDir -NotePropertyValue $ArtifactsDirectory -Force
+        if (Get-Command Set-EngineState -ErrorAction SilentlyContinue) {
+            Set-EngineState -Context $SharedSettings -Name 'releaseDir' -Value $ArtifactsDirectory
+        }
+        else {
+            $SharedSettings | Add-Member -NotePropertyName releaseDir -NotePropertyValue $ArtifactsDirectory -Force
+        }
     }
 }
 
@@ -80,15 +167,10 @@ function New-EngineContext {
         [Parameter(Mandatory = $false)]
         [psobject]$Settings,
 
-        [switch]$DryRun,
-
-        [ValidateSet('single', 'ha')]
-        [string]$DeployMode = 'ha'
+        [Parameter(Mandatory = $false)]
+        [psobject]$ExtensionData
     )
 
-    $resolvedVersion = Resolve-ReleaseVersion -Plugins $Plugins -ScriptDir $ScriptDir
-    $version = $resolvedVersion.version
-    $versionSource = $resolvedVersion.source
     $releaseRelative = '..\..\..\releases'
     $artifactsDirectory = [System.IO.Path]::GetFullPath((Join-Path $ScriptDir $releaseRelative))
 
@@ -116,48 +198,58 @@ function New-EngineContext {
         $releaseBranches = @('main')
     }
 
-    $isReleaseBranch = $releaseBranches -contains $currentBranch
-    $isNonReleaseBranch = -not $isReleaseBranch
+    $isNonReleaseBranch = -not ($releaseBranches -contains $currentBranch)
 
     Assert-WorkingTreeClean
 
-    $tag = "v$version"
-    Write-Log -Level "INFO" -Message "  Release tag default from ${versionSource}: $tag (ReleasePublishGuard may replace from git when publish is allowed)."
-
-    $dryRun = $false
-    if ($DryRun) {
-        $dryRun = $true
-    }
-    else {
-        $dryRun = Get-EngineDryRun -Settings $Settings
-    }
-    Write-Log -Level "INFO" -Message "  Dry run (remote mutations only): $dryRun"
-
-    $orchestrator = Get-MaksitOrchestrator
-    if ($orchestrator) {
-        Write-Log -Level "INFO" -Message "  Orchestrator: $orchestrator (plugin profile filtering active)"
-    }
-    else {
-        Write-Log -Level "INFO" -Message "  Orchestrator: not set (dev mode — all plugins eligible; engine probe still selects docker vs podman)"
-    }
-
-    return [pscustomobject]@{
+    $context = [pscustomobject]@{
         scriptDir = $ScriptDir
         srcDir = $SrcDir
         utilsDir = $SrcDir
         currentBranch = $currentBranch
-        version = $version
-        tag = $tag
         artifactsDirectory = $artifactsDirectory
-        isReleaseBranch = $isReleaseBranch
         isNonReleaseBranch = $isNonReleaseBranch
         releaseBranches = $releaseBranches
-        publishCompleted = $false
         skipPublishPlugins = $false
-        dryRun = $dryRun
-        deployMode = $DeployMode
-        orchestrator = $orchestrator
+        facts = [ordered]@{}
     }
+
+    $versionSource = Resolve-EngineContextVersion -Plugins $Plugins -Context $context -ScriptDir $ScriptDir
+    $version = [string](Get-EngineState -Context $context -Name 'version' -Required)
+    $tag = "v$version"
+    Set-EngineState -Context $context -Name 'tag' -Value $tag
+    Write-Log -Level "INFO" -Message "  Release tag default from ${versionSource}: $tag (ReleasePublishGuard may replace from git when publish is allowed)."
+
+    $dryRunPlugins = @(
+        $Plugins |
+            Where-Object {
+                $_.enabled -and
+                ($_.PSObject.Properties.Name -contains 'dryRun') -and
+                $null -ne $_.dryRun -and
+                [bool]$_.dryRun -and
+                (Test-PluginMutatesRemote -Plugin $_ -EngineDirectory $ScriptDir)
+            } |
+            ForEach-Object { [string]$_.name }
+    )
+    if ($dryRunPlugins.Count -gt 0) {
+        Write-Log -Level "INFO" -Message "  Plugin dryRun (validate only): $($dryRunPlugins -join ', ')"
+    }
+
+    $expandContext = Get-Command Expand-ExtensionEngineContext -ErrorAction SilentlyContinue
+    if ($expandContext) {
+        $expandParams = @{
+            Context = $context
+            ScriptDir = $ScriptDir
+            Settings = $Settings
+        }
+        if ($PSBoundParameters.ContainsKey('ExtensionData')) {
+            $expandParams['ExtensionData'] = $ExtensionData
+        }
+
+        return & $expandContext @expandParams
+    }
+
+    return $context
 }
 
 function Get-PreferredReleaseBranch {
