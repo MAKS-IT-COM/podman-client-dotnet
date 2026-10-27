@@ -7,7 +7,7 @@
 
 .DESCRIPTION
     Provides the Invoke-TestsWithCoverage function for running .NET tests
-    with Coverlet code coverage collection and parsing results.
+    with Microsoft.Testing.Platform and coverlet.MTP code coverage.
 
 .NOTES
     Author: MaksIT
@@ -63,6 +63,20 @@ function Write-TestRunnerLogInternal {
     }
 
     Write-Host $Message -ForegroundColor Gray
+}
+
+function Get-CoberturaCoverageFiles {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ResultsDirectory
+    )
+
+    # coverlet.MTP: [prefix.]coverage.cobertura[.timestamp].xml
+    $files = @(
+        Get-ChildItem -Path $ResultsDirectory -Recurse -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -like '*coverage.cobertura*.xml' }
+    )
+    return @($files | Sort-Object FullName -Unique)
 }
 
 function Invoke-TestsWithCoverage {
@@ -155,7 +169,7 @@ function Invoke-TestsWithCoverage {
     New-Item -ItemType Directory -Path $ResultsDir -Force | Out-Null
 
     if (-not $Silent) {
-        Write-TestRunnerLogInternal -Level "STEP" -Message "Running tests with code coverage..."
+        Write-TestRunnerLogInternal -Level "STEP" -Message "Running tests with code coverage (Microsoft.Testing.Platform / coverlet.MTP)..."
         foreach ($d in $resolvedProjectDirs) {
             Write-TestRunnerLogInternal -Level "INFO" -Message "Test Project: $d"
         }
@@ -164,11 +178,15 @@ function Invoke-TestsWithCoverage {
     foreach ($TestProjectDir in $resolvedProjectDirs) {
         Push-Location $TestProjectDir
         try {
+            $projectName = [System.IO.Path]::GetFileName($TestProjectDir)
             $dotnetArgs = @(
                 "test"
-                "--collect:XPlat Code Coverage"
                 "--results-directory", $ResultsDir
                 "--verbosity", $(if ($Silent) { "quiet" } else { "normal" })
+                "--coverlet"
+                "--coverlet-output-format", "cobertura"
+                "--coverlet-file-prefix", $projectName
+                "--coverlet-include", "[MaksIT.*]*"
             )
 
             Import-ExternalCommandSupportInternal
@@ -192,7 +210,7 @@ function Invoke-TestsWithCoverage {
         }
     }
 
-    $coverageFiles = @(Get-ChildItem -Path $ResultsDir -Filter "coverage.cobertura.xml" -Recurse | Sort-Object FullName)
+    $coverageFiles = @(Get-CoberturaCoverageFiles -ResultsDirectory $ResultsDir)
 
     if ($coverageFiles.Count -eq 0) {
         return [PSCustomObject]@{
@@ -455,7 +473,7 @@ function Get-DotNetCoverageFromResultsDirectory {
         [switch]$Silent
     )
 
-    $coverageFiles = @(Get-ChildItem -Path $ResultsDirectory -Filter 'coverage.cobertura.xml' -Recurse -ErrorAction SilentlyContinue | Sort-Object FullName)
+    $coverageFiles = @(Get-CoberturaCoverageFiles -ResultsDirectory $ResultsDirectory)
     if ($coverageFiles.Count -eq 0) {
         return [PSCustomObject]@{
             Success = $false
@@ -566,7 +584,7 @@ function Get-CoverageFromResultsDirectory {
         }
     }
 
-    $hasDotNet = @(Get-ChildItem -Path $resolvedDirectory -Filter 'coverage.cobertura.xml' -Recurse -ErrorAction SilentlyContinue).Count -gt 0
+    $hasDotNet = @(Get-CoberturaCoverageFiles -ResultsDirectory $resolvedDirectory).Count -gt 0
     $jestSummary = Join-Path $resolvedDirectory 'coverage-summary.json'
     $hasNpm = Test-Path -LiteralPath $jestSummary -PathType Leaf
 

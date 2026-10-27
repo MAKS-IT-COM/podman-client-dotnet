@@ -11,8 +11,9 @@
     when they do not (whenRequirementsNotMet: skip). Publish plugins no longer use per-plugin
     branch lists; put allowed branches here instead.
 
-    Typical checks: allowed branches, optional clean working tree, exact semver tag on HEAD,
-    tag version vs DotNetReleaseVersion, optional push tag to remote.
+    Typical checks: allowed branches, optional clean working tree, exact semver tag on HEAD
+    (vX.Y.Z or vX.Y.Z-prerelease such as v0.1.0-alpha.1 / v0.1.0-beta.1 / v0.1.0-rc.1),
+    tag version vs release version, optional push tag to remote.
 
     The engine preflight no longer reads git tags; this plugin sets context.tag from the
     git tag on HEAD when required. Shared context version always remains from DotNetReleaseVersion.
@@ -77,6 +78,7 @@ function Invoke-Plugin {
     Import-PluginDependency -ModuleName "GitTools" -RequiredCommand "Get-GitStatusShort"
     Import-PluginDependency -ModuleName "GitTools" -RequiredCommand "Test-RemoteTagExists"
     Import-PluginDependency -ModuleName "GitTools" -RequiredCommand "Push-TagToRemote"
+    Import-PluginDependency -ModuleName "ChangelogSupport" -RequiredCommand "Get-ChangelogSemverPattern"
 
     $pluginSettings = $Settings
     $shared = $Settings.context
@@ -123,8 +125,9 @@ function Invoke-Plugin {
             return
         }
 
-        if ($tag -notmatch '^v(\d+\.\d+\.\d+)$') {
-            Invoke-NotMetInternal -Shared $shared -When $when -Reason "tag '$tag' must match vX.Y.Z."
+        $tagPattern = '^v(' + (Get-ChangelogSemverPattern) + ')$'
+        if ($tag -notmatch $tagPattern) {
+            Invoke-NotMetInternal -Shared $shared -When $when -Reason "tag '$tag' must match vX.Y.Z or vX.Y.Z-prerelease (e.g. v0.1.0-alpha.1, v0.1.0-beta.1, v0.1.0-rc.1)."
             return
         }
 

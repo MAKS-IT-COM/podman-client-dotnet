@@ -1,8 +1,8 @@
 # PodmanClient.DotNet
 
-![Line Coverage](https://img.shields.io/badge/Line%20Coverage-6.2%25-red)
-![Branch Coverage](https://img.shields.io/badge/Branch%20Coverage-14.5%25-orange)
-![Method Coverage](https://img.shields.io/badge/Method%20Coverage-4.4%25-red)
+![Line Coverage](https://img.shields.io/badge/Line%20Coverage-0%25-red)
+![Branch Coverage](https://img.shields.io/badge/Branch%20Coverage-0%25-red)
+![Method Coverage](https://img.shields.io/badge/Method%20Coverage-0%25-red)
 
 ## Description
 

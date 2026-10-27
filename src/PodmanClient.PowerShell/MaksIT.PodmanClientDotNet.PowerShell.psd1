@@ -1,6 +1,6 @@
 @{
     RootModule        = 'MaksIT.PodmanClientDotNet.PowerShell.dll'
-    ModuleVersion      = '1.3.0'
+    ModuleVersion      = '1.3.2'
     GUID               = 'b7e4c2a1-9f3d-4e8b-a6c5-1d2e3f4a5b6c'
     Author             = 'Maksym Sadovnychyy'
     CompanyName        = 'MAKS-IT'

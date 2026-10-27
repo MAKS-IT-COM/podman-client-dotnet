@@ -7,9 +7,10 @@
 
 .DESCRIPTION
     Reads a single-line semver from the configured versionFilePath (default
-    repo-root VERSION). Useful for repositories without .csproj or package.json
-    version metadata. Declares providesVersion = $true so the engine can
-    discover it as the single release version source.
+    repo-root VERSION), including optional prerelease (0.1.0-alpha.1). Useful for
+    repositories without .csproj or package.json version metadata. Declares
+    providesVersion = $true so the engine can discover it as the single release
+    version source.
 #>
 
 if (-not (Get-Command Import-PluginDependency -ErrorAction SilentlyContinue)) {
@@ -36,8 +37,9 @@ function Get-VersionFileSemverInternal {
     }
 
     $version = $version -replace '^[vV]', ''
-    if ($version -notmatch '^\d+\.\d+\.\d+') {
-        throw "FileReleaseVersion: version '$version' in '$VersionFilePath' is not a valid semver."
+    Import-PluginDependency -ModuleName "ChangelogSupport" -RequiredCommand "Test-ReleaseSemver"
+    if (-not (Test-ReleaseSemver -Version $version)) {
+        throw "FileReleaseVersion: version '$version' in '$VersionFilePath' is not a valid semver (X.Y.Z or X.Y.Z-prerelease)."
     }
 
     return $version
@@ -55,6 +57,7 @@ function Invoke-Plugin {
 
     Import-PluginDependency -ModuleName "Logging" -RequiredCommand "Write-Log"
     Import-PluginDependency -ModuleName "EngineContext" -RequiredCommand "Set-EngineState"
+    Import-PluginDependency -ModuleName "ChangelogSupport" -RequiredCommand "Test-ReleaseSemver"
 
     $shared = $Settings.context
     $versionFileSetting = if ($Settings.versionFilePath) {

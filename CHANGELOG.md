@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.2] - 2026-10-27
+
+### Changed
+
+- **Tests:** migrate to **xunit.v3** **4.0.2** + **Microsoft Testing Platform** only (`src/global.json` `test.runner`; no VSTest / **coverlet.collector** / **Microsoft.NET.Test.Sdk** / **xunit.runner.visualstudio**). Use **coverlet.MTP**; **TestRunner** always uses `--coverlet`.
+- Set library **AssemblyName** to `MaksIT.PodmanClientDotNet` so **coverlet.MTP** `--coverlet-include [MaksIT.*]*` matches.
+- Updated **MaksIT.Results** (2.0.6), **Microsoft.Extensions.*** (10.0.14), and **System.Management.Automation** (7.6.9) package references.
+- Synced **RepoUtils** (`utils/`): engine/plugin updates (VaultSupport, coverage/artifact discovery, ContainerEngineProbe); removed unused Npm plugins and DotNetCleanupArtifacts; NuGet publish moved to GitHub Actions OIDC (`.github/workflows/publish-nuget.yml`).
+- Package version **1.3.2** (`PodmanClient.DotNet` and `PodmanClient.PowerShell`).
+
 ## [1.3.1] - 2026-08-14
 
 ### Changed
@@ -141,3 +151,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Exec operations: create, start, inspect.
 - Image operations: pull, tag.
 - NuGet packaging (`.nuspec`, `Release-NuGetPackage` scripts) and README.
+

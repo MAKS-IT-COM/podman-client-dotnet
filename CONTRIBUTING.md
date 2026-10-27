@@ -25,6 +25,8 @@ dotnet build src/PodmanClientDotNet.slnx
 utils/Invoke-TestEngine.bat
 ```
 
+Tests run under **Microsoft Testing Platform** (`src/global.json` `test.runner`) with **xunit.v3** and **coverlet.MTP**.
+
 **Direct:**
 
 ```bash
@@ -133,4 +135,4 @@ Types: `(feature):`, `(bugfix):`, `(refactor):`, `(perf):`, `(test):`, `(docs):`
 
 ## Versioning
 
-[Semantic Versioning](https://semver.org): bump `Version` in `src/PodmanClient/PodmanClientDotNet.csproj` with **CHANGELOG.md** for releases. Use `utils\Invoke-ReleasePackage-Single.bat` when releasing.
+[Semantic Versioning](https://semver.org): bump `Version` in `src/PodmanClient/PodmanClientDotNet.csproj` with **CHANGELOG.md** for releases (`X.Y.Z` or prerelease such as `0.1.0-alpha.1`). Tag `v{version}` on HEAD. Use `utils\Invoke-ReleasePackage-Single.bat` when releasing.

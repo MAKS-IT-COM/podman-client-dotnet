@@ -2,6 +2,8 @@
   "$schema": "https://json-schema.org/draft-07/schema",
   "title": "Release Package Script Settings",
   "description": "Invoke-ReleasePackage.ps1 plugin settings for PodmanClient.DotNet.",
+  "repoUtilsSecretsShared": "RepoUtilsSecretsShared",
+  "repoUtilsSecrets": "RepoUtilsSecrets",
   "plugins": [
     {
       "name": "DotNetReleaseVersion",
@@ -61,20 +63,13 @@
       "name": "GitHub",
       "stageLabel": "release",
       "enabled": true,
-      "githubSecret": "GitHub",
+      "githubSecret": "GitClone",
       "repository": "https://github.com/MAKS-IT-COM/podman-client-dotnet",
       "releaseNotesFile": "..\\..\\..\\CHANGELOG.md",
       "releaseTitlePattern": "Release {version}"
     },
     {
-      "name": "DotNetNuGet",
-      "stageLabel": "release",
-      "enabled": true,
-      "nugetSecret": "NuGet",
-      "source": "https://api.nuget.org/v3/index.json"
-    },
-    {
-      "name": "DotNetCleanupArtifacts",
+      "name": "CleanupArtifacts",
       "stageLabel": "release",
       "enabled": true,
       "includePatterns": [

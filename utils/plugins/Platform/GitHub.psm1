@@ -10,7 +10,8 @@
     repository, and creates the configured GitHub release using the
     shared release artifacts and release notes from CHANGELOG.md.
     Release notes must use Keep a Changelog headers: ## [semver] - YYYY-MM-DD
-    (see ChangelogSupport.psm1).
+    (including optional SemVer prerelease, e.g. ## [0.1.0-alpha.1] / [0.1.0-beta.1] / [0.1.0-rc.1];
+    see ChangelogSupport.psm1). Hyphenated versions are created with gh --prerelease.
 #>
 
 if (-not (Get-Command Import-PluginDependency -ErrorAction SilentlyContinue)) {
@@ -95,11 +96,11 @@ function Invoke-Plugin {
     Import-PluginDependency -ModuleName "Logging" -RequiredCommand "Write-Log"
     Import-PluginDependency -ModuleName "ScriptConfig" -RequiredCommand "Assert-Command"
     Import-PluginDependency -ModuleName "ChangelogSupport" -RequiredCommand "Get-LatestChangelogVersion"
+    Import-PluginDependency -ModuleName "ChangelogSupport" -RequiredCommand "Test-ReleaseSemverPrerelease"
     Import-PluginDependency -ModuleName "EngineContext" -RequiredCommand "Get-EngineFact"
 
     $pluginSettings = $Settings
     $sharedSettings = $Settings.context
-    $githubSecret = Resolve-PluginSecretName -PluginSettings $pluginSettings -PropertyName 'githubSecret'
     $configuredRepository = $pluginSettings.repository
     $releaseNotesFileSetting = $pluginSettings.releaseNotesFile
     $releaseTitlePatternSetting = $pluginSettings.releaseTitlePattern
@@ -110,6 +111,7 @@ function Invoke-Plugin {
     $releaseAssetPaths = @()
 
     $dryRun = Test-PluginSkipsRemoteMutation -Plugin $pluginSettings -SharedSettings $sharedSettings
+    $githubSecret = Resolve-PluginSecretName -PluginSettings $pluginSettings -PropertyName 'githubSecret' -PluginDisplayName 'GitHub' -Required
 
     if ([string]::IsNullOrWhiteSpace($releaseNotesFileSetting)) {
         throw "GitHub plugin requires 'releaseNotesFile' in scriptSettings.json."
@@ -128,18 +130,17 @@ function Invoke-Plugin {
         }
         $releaseName = $releaseTitlePattern -replace '\{version\}', $version
         Write-Log -Level "INFO" -Message "Dry run: would create GitHub release '$releaseName' ($tag) on $repo"
+        if (Test-ReleaseSemverPrerelease -Version ([string]$version)) {
+            Write-Log -Level "INFO" -Message "Dry run: release would be marked prerelease."
+        }
         return
     }
 
     Assert-Command gh
 
-    if ([string]::IsNullOrWhiteSpace($githubSecret)) {
-        throw "GitHub plugin requires 'githubSecret' in scriptSettings.json (logical secret name, e.g. GitHub)."
-    }
-
-    $ghToken = Get-SecretEnvironmentValue -Name $githubSecret
+    $ghToken = Get-RepoUtilsSecretSlot -Name $githubSecret -Settings $sharedSettings
     if ([string]::IsNullOrWhiteSpace($ghToken)) {
-        throw "GitHub token is not set. Set environment variable '$githubSecret'."
+        throw "GitHub token is not set. Set RepoUtilsSecrets slot '$githubSecret' (githubSecret)."
     }
 
     if ([string]::IsNullOrWhiteSpace($releaseNotesFileSetting)) {
@@ -230,7 +231,7 @@ function Invoke-Plugin {
                 $authStatus | ForEach-Object { Write-Log -Level "WARN" -Message "    $_" }
             }
 
-            throw "GitHub CLI authentication failed for repository '$repo'. Ensure secret '$githubSecret' is valid and has access to this repository."
+            throw "GitHub CLI authentication failed for repository '$repo'. Ensure RepoUtilsSecrets slot '$githubSecret' is valid and has access to this repository."
         }
 
         Write-Log -Level "OK" -Message "  GitHub token validated for repository: $($authOutput | Select-Object -First 1)"
@@ -261,6 +262,10 @@ function Invoke-Plugin {
                 "--title", $releaseName,
                 "--notes-file", $notesFilePath
             )
+            if (Test-ReleaseSemverPrerelease -Version ([string]$version)) {
+                $createReleaseArgs += '--prerelease'
+            }
+
             & gh @createReleaseArgs
 
             if ($LASTEXITCODE -ne 0) {

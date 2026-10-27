@@ -27,6 +27,10 @@ function Clear-ExternalCommandTestHandler {
     $script:ExternalCommandTestHandler = $null
 }
 
+function Test-ExternalCommandTestHandler {
+    return ($null -ne $script:ExternalCommandTestHandler)
+}
+
 function Set-ExternalCommandAvailability {
     param(
         [Parameter(Mandatory = $true)]
@@ -107,7 +111,7 @@ function Invoke-ExternalCommand {
         if ($ThrowOnError -and $exitCode -ne 0) {
             $preview = ($output | ForEach-Object {
                     if ($_ -is [System.Management.Automation.ErrorRecord]) { $_.ToString() } else { [string]$_ }
-                } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -First 8) -join ' '
+                } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Last 12) -join ' '
             if ([string]::IsNullOrWhiteSpace($preview)) {
                 throw "External command '$Name' failed with exit code $exitCode."
             }
@@ -128,4 +132,5 @@ Export-ModuleMember -Function `
     Invoke-ExternalCommand, `
     Set-ExternalCommandTestHandler, `
     Clear-ExternalCommandTestHandler, `
+    Test-ExternalCommandTestHandler, `
     Set-ExternalCommandAvailability
